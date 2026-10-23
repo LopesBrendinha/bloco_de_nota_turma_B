@@ -1,0 +1,19 @@
+flutter pub add firebase_core
+flutter pub add firebase_auth
+flutter pub add sqflite
+flutter pub add path
+
+npm install -g firebase-tools (TEM QUE SER NO CMD)
+
+firebase login
+
+dart pub global activate flutterfire_cli +
+
+
+dart pub global run flutterfire_cli:flutterfire configure
+
+flutterfire configure
+
+
+
+
