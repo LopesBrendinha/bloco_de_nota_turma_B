@@ -1,6 +1,3 @@
-import 'dart:math';
-
-import 'package:blocodenotasturmab/screens/notes_page.dart';
 import 'package:blocodenotasturmab/screens/register_page.dart';
 import 'package:blocodenotasturmab/services/auth_service.dart';
 import 'package:flutter/material.dart';
@@ -40,19 +37,14 @@ class _LoginPageState extends State<LoginPage> {
       loading = true;
     });
     try {
-      final user = await authService.login(
+      // Não navegamos daqui: o AuthGate (main.dart) percebe o login e
+      // mostra a tela de notas automaticamente.
+      await authService.login(
         emailController.text.trim(),
-        passwordController.text.trim(),
+        passwordController.text,
       );
-
-      if (user != null && mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => NotesPage()),
-        );
-      }
     } catch (e) {
-      showMessage("Não foi posível realizar o login.");
+      showMessage(AuthService.friendlyError(e));
     }
 
     if (mounted) {

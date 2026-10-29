@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "363520809972",
-    "project_id": "bdbloco",
-    "storage_bucket": "bdbloco.firebasestorage.app"
+    "project_number": "534009443986",
+    "project_id": "notepad-cumbuca",
+    "storage_bucket": "notepad-cumbuca.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:363520809972:android:6a7d83d420af207e1637a1",
+        "mobilesdk_app_id": "1:534009443986:android:3b5a33a6bdcb74b46c184b",
         "android_client_info": {
           "package_name": "com.example.blocodenotasturmab"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBxyB_nAaX3iEQdW-1h_z3DkCDjlLRzb2k"
+          "current_key": "AIzaSyCM-NPkjqn5iA2MFypaTZH0468eGisy8rs"
         }
       ],
       "services": {

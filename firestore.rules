@@ -1,0 +1,64 @@
+rules_version = '2';
+
+// Regras de segurança do Cloud Firestore do Bloco de Notas.
+//
+// Estrutura:
+//   users/{uid}/notes/{noteId}
+//   users/{uid}/categories/{categoryId}
+//
+// Cada usuário autenticado só pode ler e gravar dentro de users/{seu uid}.
+// Qualquer outro caminho é bloqueado.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function isOptionalInt(value) {
+      return value == null || value is int;
+    }
+
+    // Valida o formato da nota gravada, impedindo, por exemplo, que alguém
+    // grave uma nota com o uid de outra pessoa.
+    function isValidNote(uid) {
+      let data = request.resource.data;
+      return data.keys().hasOnly(
+               ['uid', 'title', 'content', 'category',
+                'createdAt', 'updatedAt', 'deletedAt'])
+          && data.keys().hasAll(
+               ['uid', 'title', 'content', 'category', 'createdAt', 'updatedAt'])
+          && data.uid == uid
+          && data.title is string && data.title.size() <= 200
+          && data.content is string && data.content.size() <= 20000
+          && data.category is string
+          && data.category.size() > 0 && data.category.size() <= 30
+          && data.createdAt is int
+          && data.updatedAt is int
+          && isOptionalInt(data.get('deletedAt', null));
+    }
+
+    function isValidCategory(uid) {
+      let data = request.resource.data;
+      return data.keys().hasOnly(['uid', 'name'])
+          && data.uid == uid
+          && data.name is string
+          && data.name.size() > 0 && data.name.size() <= 30;
+    }
+
+    match /users/{uid}/notes/{noteId} {
+      allow read, delete: if isOwner(uid);
+      allow create, update: if isOwner(uid) && isValidNote(uid);
+    }
+
+    match /users/{uid}/categories/{categoryId} {
+      allow read, delete: if isOwner(uid);
+      allow create, update: if isOwner(uid) && isValidCategory(uid);
+    }
+
+    // Bloqueia todo o resto.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

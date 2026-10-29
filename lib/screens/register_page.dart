@@ -38,8 +38,8 @@ class _RegisterPageState extends State<RegisterPage> {
 
   Future<void> register() async {
     final email = emailController.text.trim();
-    final password = passwordController.text.trim();
-    final confirm = confirmPasswordController.text.trim();
+    final password = passwordController.text;
+    final confirm = confirmPasswordController.text;
 
     if (email.isEmpty || password.isEmpty || confirm.isEmpty) {
       showMessage("Preencha todos os campos");
@@ -55,14 +55,17 @@ class _RegisterPageState extends State<RegisterPage> {
     });
 
     try {
+      // Após o cadastro o Firebase já deixa o usuário logado; ao fechar esta
+      // tela, o AuthGate mostra a lista de notas.
       await authService.register(email, password);
 
       if (mounted) {
         showMessage("Conta criada com sucesso!");
         Navigator.pop(context);
       }
+      return;
     } catch (e) {
-      showMessage("Não foi possível criar a conta.");
+      showMessage(AuthService.friendlyError(e));
     }
 
     if (mounted) {
