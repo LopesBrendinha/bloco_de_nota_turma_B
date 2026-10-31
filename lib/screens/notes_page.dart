@@ -21,16 +21,28 @@ class _NotesPageState extends State<NotesPage> {
 
   final AuthService authService = AuthService();
 
+  final TextEditingController searchController = TextEditingController();
+
   List<Note> notes = [];
 
   // Filtro de categoria da lista ('Todas' mostra tudo).
   String selectedCategory = 'Todas';
+
+  // Ordenação da lista: 'criacao' ou 'atualizacao'.
+  String sortBy = 'criacao';
 
   @override
   void initState() {
     super.initState();
 
     startUp();
+  }
+
+  @override
+  void dispose() {
+    searchController.dispose();
+
+    super.dispose();
   }
 
   // Mostra primeiro as notas locais (rápido) e depois sincroniza
@@ -58,12 +70,16 @@ class _NotesPageState extends State<NotesPage> {
     }
   }
 
+  // Busca no banco local, já aplicando o texto da pesquisa.
   Future<void> loadNotes() async {
     final user = FirebaseAuth.instance.currentUser;
 
     if (user == null) return;
 
-    final result = await repository.getNotes(user.uid);
+    final result = await repository.getNotes(
+      user.uid,
+      search: searchController.text,
+    );
 
     if (mounted) {
       setState(() {
@@ -121,14 +137,33 @@ class _NotesPageState extends State<NotesPage> {
     await loadNotes();
   }
 
+  // Aplica o filtro de categoria e a ordenação escolhida.
+  List<Note> getVisibleNotes() {
+    final filtered = selectedCategory == 'Todas'
+        ? List<Note>.of(notes)
+        : notes.where((n) => n.category == selectedCategory).toList();
+
+    filtered.sort((a, b) {
+      if (sortBy == 'atualizacao') {
+        final cmp = b.updatedAt.compareTo(a.updatedAt);
+
+        if (cmp != 0) return cmp;
+      }
+
+      // Criação (ou desempate): o id é a hora de criação.
+      return b.id!.compareTo(a.id!);
+    });
+
+    return filtered;
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
 
-    // Notas que aparecem na tela, de acordo com o filtro escolhido.
-    final visibleNotes = selectedCategory == 'Todas'
-        ? notes
-        : notes.where((n) => n.category == selectedCategory).toList();
+    final hasSearch = searchController.text.trim().isNotEmpty;
+
+    final visibleNotes = getVisibleNotes();
 
     return Scaffold(
       appBar: AppBar(
@@ -177,6 +212,28 @@ class _NotesPageState extends State<NotesPage> {
 
             const SizedBox(height: 14),
 
+            // Campo de pesquisa (título ou conteúdo).
+            TextField(
+              controller: searchController,
+              onChanged: (_) => loadNotes(),
+              decoration: InputDecoration(
+                hintText: 'Pesquisar por título ou conteúdo',
+                prefixIcon: const Icon(Icons.search_rounded),
+                suffixIcon: hasSearch
+                    ? IconButton(
+                        tooltip: 'Limpar pesquisa',
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () {
+                          searchController.clear();
+                          loadNotes();
+                        },
+                      )
+                    : null,
+              ),
+            ),
+
+            const SizedBox(height: 14),
+
             // Filtro por categoria.
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -196,6 +253,50 @@ class _NotesPageState extends State<NotesPage> {
                   );
                 }).toList(),
               ),
+            ),
+
+            const SizedBox(height: 10),
+
+            // Ordenação por data.
+            Row(
+              children: [
+                const Icon(
+                  Icons.sort_rounded,
+                  size: 18,
+                  color: Color(0xFF77717F),
+                ),
+
+                const SizedBox(width: 8),
+
+                const Text(
+                  'Ordenar por:',
+                  style: TextStyle(color: Color(0xFF77717F), fontSize: 13),
+                ),
+
+                const SizedBox(width: 8),
+
+                ChoiceChip(
+                  label: const Text('Criação'),
+                  selected: sortBy == 'criacao',
+                  onSelected: (_) {
+                    setState(() {
+                      sortBy = 'criacao';
+                    });
+                  },
+                ),
+
+                const SizedBox(width: 8),
+
+                ChoiceChip(
+                  label: const Text('Atualização'),
+                  selected: sortBy == 'atualizacao',
+                  onSelected: (_) {
+                    setState(() {
+                      sortBy = 'atualizacao';
+                    });
+                  },
+                ),
+              ],
             ),
 
             const SizedBox(height: 14),
@@ -226,9 +327,11 @@ class _NotesPageState extends State<NotesPage> {
                       const SizedBox(height: 25),
 
                       Text(
-                        notes.isEmpty
-                            ? 'Nenhuma nota ainda'
-                            : 'Nenhuma nota nesta categoria',
+                        hasSearch
+                            ? 'Nenhuma nota encontrada'
+                            : (notes.isEmpty
+                                  ? 'Nenhuma nota ainda'
+                                  : 'Nenhuma nota nesta categoria'),
                         style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
@@ -237,9 +340,11 @@ class _NotesPageState extends State<NotesPage> {
 
                       const SizedBox(height: 8),
 
-                      const Text(
-                        'Crie sua primeira nota.',
-                        style: TextStyle(color: Color(0xFF77717F)),
+                      Text(
+                        hasSearch
+                            ? 'Tente outro termo ou outra categoria.'
+                            : 'Crie sua primeira nota.',
+                        style: const TextStyle(color: Color(0xFF77717F)),
                       ),
                     ],
                   ),

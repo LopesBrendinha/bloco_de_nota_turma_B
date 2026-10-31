@@ -8,8 +8,8 @@ class NoteRepository {
   final DatabaseHelper _local = DatabaseHelper.instance;
   final FirestoreService _remote = FirestoreService();
 
-  Future<List<Note>> getNotes(String uid) {
-    return _local.getNotes(uid);
+  Future<List<Note>> getNotes(String uid, {String search = ''}) {
+    return _local.getNotes(uid, search: search);
   }
 
   // Retorna true se a nota também foi gravada no Firebase.
