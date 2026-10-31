@@ -1,7 +1,6 @@
-
-
-import 'package:blocodenotasturmab/database/database_helper.dart';
+import 'package:blocodenotasturmab/models/categories.dart';
 import 'package:blocodenotasturmab/models/note.dart';
+import 'package:blocodenotasturmab/services/note_repository.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -19,7 +18,11 @@ class _NoteFormPageState extends State<NoteFormPage> {
 
   final contentController = TextEditingController();
 
-  final database = DatabaseHelper.instance;
+  final repository = NoteRepository();
+
+  String category = 'Geral';
+
+  bool saving = false;
 
   bool get isEditing => widget.note != null;
 
@@ -31,28 +34,30 @@ class _NoteFormPageState extends State<NoteFormPage> {
       titleController.text = widget.note!.title;
 
       contentController.text = widget.note!.content;
+
+      category = widget.note!.category;
     }
   }
 
   Future<void> saveNote() async {
-    // Pegamos o usuário atualmente autenticado.
     final user = FirebaseAuth.instance.currentUser;
 
-    // Sem usuário não podemos salvar.
     if (user == null) return;
 
-    // Pegamos os valores digitados.
     final title = titleController.text.trim();
 
     final content = contentController.text.trim();
 
-    // Verificamos se existe conteúdo.
-    if (content.isEmpty) {
+    if (content.isEmpty || saving) {
       return;
     }
 
-    // Criamos a data da alteração.
+    setState(() {
+      saving = true;
+    });
+
     final now = DateTime.now();
+    final nowIso = now.toIso8601String();
 
     final date =
         '${now.day.toString().padLeft(2, '0')}/'
@@ -61,37 +66,37 @@ class _NoteFormPageState extends State<NoteFormPage> {
         '${now.hour.toString().padLeft(2, '0')}:'
         '${now.minute.toString().padLeft(2, '0')}';
 
-    // Criamos um objeto Note.
-    //
-    // Se estamos editando:
-    //     widget.note?.id
-    // mantém o ID existente.
-    //
-    // Se estamos criando:
-    //     o ID será null.
+    // Nota nova: o id é a hora atual em milissegundos (não repete
+    // entre instalações). Edição: mantém id e data de criação.
+    final oldCreatedAt = widget.note?.createdAt ?? '';
+
     final note = Note(
-      id: widget.note?.id,
+      id: widget.note?.id ?? now.millisecondsSinceEpoch,
       uid: user.uid,
       title: title,
       content: content,
       date: date,
+      category: category,
+      createdAt: oldCreatedAt.isEmpty ? nowIso : oldCreatedAt,
+      updatedAt: nowIso,
     );
 
-    // Verificamos se estamos criando
-    // ou editando uma nota.
-    if (isEditing) {
-      // UPDATE
-      await database.updateNote(note);
-    } else {
-      // INSERT
-      await database.insertNote(note);
+    final synced = await repository.saveNote(note, isNew: !isEditing);
+
+    if (!mounted) return;
+
+    if (!synced) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Nota salva neste dispositivo, mas não foi possível '
+            'enviá-la ao Firebase.',
+          ),
+        ),
+      );
     }
 
-    // Depois de salvar,
-    // voltamos para a tela anterior.
-    if (mounted) {
-      Navigator.pop(context);
-    }
+    Navigator.pop(context);
   }
 
   @override
@@ -113,7 +118,7 @@ class _NoteFormPageState extends State<NoteFormPage> {
 
         actions: [
           IconButton(
-            onPressed: saveNote,
+            onPressed: saving ? null : saveNote,
             icon: const Icon(Icons.check_rounded),
           ),
 
@@ -144,6 +149,25 @@ class _NoteFormPageState extends State<NoteFormPage> {
             ),
 
             const Divider(color: Color(0xFFE4DFEA)),
+
+            // Seleção da categoria da nota.
+            SizedBox(
+              width: double.infinity,
+              child: Wrap(
+                spacing: 8,
+                children: noteCategories.map((item) {
+                  return ChoiceChip(
+                    label: Text(item),
+                    selected: category == item,
+                    onSelected: (_) {
+                      setState(() {
+                        category = item;
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+            ),
 
             Expanded(
               child: TextField(
