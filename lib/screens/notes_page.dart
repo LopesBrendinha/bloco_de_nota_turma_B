@@ -1,9 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-import '../database/database_helper.dart';
 import '../models/note.dart';
 import '../services/auth_service.dart';
+import '../services/note_repository.dart';
 import '../widgets/note_card.dart';
 import 'login_page.dart';
 import 'note_form_page.dart';
@@ -16,7 +16,7 @@ class NotesPage extends StatefulWidget {
 }
 
 class _NotesPageState extends State<NotesPage> {
-  final DatabaseHelper database = DatabaseHelper.instance;
+  final NoteRepository repository = NoteRepository();
 
   final AuthService authService = AuthService();
 
@@ -26,52 +26,64 @@ class _NotesPageState extends State<NotesPage> {
   void initState() {
     super.initState();
 
-    loadNotes();
+    startUp();
+  }
+
+  // Mostra primeiro as notas locais (rápido) e depois sincroniza
+  // com o Firebase e atualiza a lista.
+  Future<void> startUp() async {
+    await loadNotes();
+
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) return;
+
+    final synced = await repository.syncFromCloud(user.uid);
+
+    await loadNotes();
+
+    if (!synced && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Não foi possível sincronizar com o Firebase. '
+            'Mostrando as notas salvas neste dispositivo.',
+          ),
+        ),
+      );
+    }
   }
 
   Future<void> loadNotes() async {
-    // Recuperamos o usuário atualmente
-    // autenticado no Firebase.
     final user = FirebaseAuth.instance.currentUser;
 
-    // Se não houver usuário,
-    // não podemos buscar as notas.
     if (user == null) return;
 
-    // Enviamos o UID para o banco local.
-    //
-    // O banco irá buscar somente as notas
-    // pertencentes a esse usuário.
-    final result = await database.getNotes(user.uid);
+    final result = await repository.getNotes(user.uid);
 
     if (mounted) {
-      // Atualizamos a lista utilizada
-      // pela interface.
       setState(() {
         notes = result;
       });
     }
   }
 
-  Future<void> deleteNote(int id) async {
-    // Enviamos o ID da nota para o banco.
-    //
-    // O banco executará:
-    //
-    // DELETE FROM notes
-    // WHERE id = ?
-    //
-    // O ? será substituído pelo ID.
-    await database.deleteNote(id);
+  Future<void> deleteNote(Note note) async {
+    final synced = await repository.deleteNote(note);
 
-    // Depois de excluir,
-    // buscamos novamente as notas.
     await loadNotes();
 
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Nota excluída.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            synced
+                ? 'Nota excluída.'
+                : 'Nota excluída neste dispositivo, mas não foi possível '
+                      'removê-la do Firebase.',
+          ),
+        ),
+      );
     }
   }
 
@@ -88,27 +100,20 @@ class _NotesPageState extends State<NotesPage> {
   }
 
   Future<void> openNewNote() async {
-    // Abre a tela responsável pelo formulário.
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const NoteFormPage()),
     );
 
-    // Quando o usuário voltar para essa página,
-    // buscamos novamente as notas.
     await loadNotes();
   }
 
   Future<void> openEditNote(Note note) async {
-    // Passamos a nota selecionada
-    // para a tela de edição.
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => NoteFormPage(note: note)),
     );
 
-    // Quando retornar da edição,
-    // atualizamos a lista.
     await loadNotes();
   }
 
@@ -174,8 +179,8 @@ class _NotesPageState extends State<NotesPage> {
                         width: 100,
                         height: 100,
 
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEDE5FA),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFEDE5FA),
                           shape: BoxShape.circle,
                         ),
 
@@ -219,7 +224,7 @@ class _NotesPageState extends State<NotesPage> {
 
                       onTap: () => openEditNote(note),
 
-                      onDelete: () => deleteNote(note.id!),
+                      onDelete: () => deleteNote(note),
                     );
                   },
                 ),
