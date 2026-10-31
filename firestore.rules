@@ -1,0 +1,54 @@
+rules_version = '2';
+
+// Regras de segurança do Cloud Firestore — Bloco de Notas.
+//
+// Publicar com:
+//   firebase deploy --only firestore:rules
+//
+// Modelo de dados:
+//   users/{userId}/notes/{noteId}
+//   users/{userId}/categories/{categoryId}
+//
+// A proteção vem da própria estrutura: os dados de cada pessoa ficam dentro
+// do documento dela, então basta comparar o {userId} do caminho com o UID do
+// token autenticado. Como o Firestore não permite consultar uma subcoleção
+// sem passar pelo caminho completo, não existe consulta capaz de devolver as
+// notas de outro usuário — a regra recusa antes de ler qualquer documento.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Verdadeiro quando há um usuário autenticado e ele é o dono do caminho.
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // O campo uid gravado no documento precisa bater com o dono do caminho.
+    // Impede que alguém grave um documento na própria subcoleção marcando-o
+    // como pertencente a outra pessoa.
+    function uidMatches(userId) {
+      return !('uid' in request.resource.data)
+             || request.resource.data.uid == userId;
+    }
+
+    match /users/{userId} {
+      // O documento do usuário em si não guarda dados e não é usado pelo
+      // aplicativo; nega-se o acesso direto a ele.
+      allow read, write: if false;
+
+      match /notes/{noteId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId) && uidMatches(userId);
+      }
+
+      match /categories/{categoryId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId) && uidMatches(userId);
+      }
+    }
+
+    // Qualquer caminho não previsto acima é negado.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

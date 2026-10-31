@@ -1,6 +1,3 @@
-import 'dart:math';
-
-import 'package:blocodenotasturmab/screens/notes_page.dart';
 import 'package:blocodenotasturmab/screens/register_page.dart';
 import 'package:blocodenotasturmab/services/auth_service.dart';
 import 'package:flutter/material.dart';
@@ -40,19 +37,17 @@ class _LoginPageState extends State<LoginPage> {
       loading = true;
     });
     try {
-      final user = await authService.login(
+      await authService.login(
         emailController.text.trim(),
         passwordController.text.trim(),
       );
 
-      if (user != null && mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => NotesPage()),
-        );
-      }
-    } catch (e) {
-      showMessage("Não foi posível realizar o login.");
+      // Em caso de sucesso o AuthGate (main.dart) troca de tela sozinho,
+      // porque ele escuta o authStateChanges do Firebase.
+    } on AuthException catch (error) {
+      showMessage(error.message);
+    } catch (_) {
+      showMessage("Não foi possível realizar o login.");
     }
 
     if (mounted) {

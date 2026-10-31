@@ -57,11 +57,15 @@ class _RegisterPageState extends State<RegisterPage> {
     try {
       await authService.register(email, password);
 
+      // O registro já deixa o usuário autenticado; o AuthGate (main.dart)
+      // leva direto para a lista de notas.
       if (mounted) {
         showMessage("Conta criada com sucesso!");
         Navigator.pop(context);
       }
-    } catch (e) {
+    } on AuthException catch (error) {
+      showMessage(error.message);
+    } catch (_) {
       showMessage("Não foi possível criar a conta.");
     }
 
