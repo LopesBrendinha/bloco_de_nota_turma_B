@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:blocodenotasturmab/database/database_helper.dart';
 import 'package:blocodenotasturmab/models/note_sort.dart';
 import 'package:blocodenotasturmab/models/sync_status.dart';
@@ -269,6 +271,27 @@ void main() {
   });
 
   group('Tratamento de falhas de conexão', () {
+    test('uma operação que nunca responde vira falha de conexão', () async {
+      // O SDK do Firestore não lança erro quando não alcança o servidor:
+      // ele retenta para sempre e o Future nunca completa. Sem o timeout
+      // do FirestoreService, a tela travaria em silêncio.
+      final service = FirestoreService(
+        firestore: FakeFirebaseFirestore(),
+        timeout: const Duration(milliseconds: 50),
+      );
+
+      final nuncaCompleta = Completer<void>().future;
+
+      await expectLater(
+        service.guard(() => nuncaCompleta, 'falhou'),
+        throwsA(
+          isA<CloudException>()
+              .having((error) => error.isOffline, 'isOffline', isTrue)
+              .having((error) => error.code, 'code', 'timeout'),
+        ),
+      );
+    });
+
     test('sem internet a nota é salva localmente e fica pendente', () async {
       final offline = NoteRepository(cloud: _OfflineFirestoreService());
 

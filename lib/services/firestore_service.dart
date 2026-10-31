@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/note.dart';
 import '../models/note_category.dart';
@@ -33,10 +36,17 @@ class CloudException implements Exception {
 /// `{uid}` do caminho com `request.auth.uid`. Nenhuma consulta consegue
 /// alcançar a subcoleção de outro usuário.
 class FirestoreService {
-  FirestoreService({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+  FirestoreService({FirebaseFirestore? firestore, Duration? timeout})
+      : _firestore = firestore ?? FirebaseFirestore.instance,
+        _timeout = timeout ?? const Duration(seconds: 10);
 
   final FirebaseFirestore _firestore;
+
+  /// Tempo máximo de espera por uma operação remota.
+  ///
+  /// É o que impede a interface de travar quando o servidor não responde —
+  /// ver a explicação em [guard].
+  final Duration _timeout;
 
   CollectionReference<Map<String, dynamic>> _notes(String uid) =>
       _firestore.collection('users').doc(uid).collection('notes');
@@ -50,14 +60,14 @@ class FirestoreService {
 
   /// Cria ou substitui o documento da nota. O UUID local é o ID do documento.
   Future<void> upsertNote(Note note) async {
-    await _guard(
+    await guard(
       () => _notes(note.uid).doc(note.id).set(note.toRemoteMap()),
       'Não foi possível salvar a nota na nuvem.',
     );
   }
 
   Future<void> deleteNote({required String uid, required String id}) async {
-    await _guard(
+    await guard(
       () => _notes(uid).doc(id).delete(),
       'Não foi possível excluir a nota na nuvem.',
     );
@@ -68,9 +78,16 @@ class FirestoreService {
   /// A lixeira é um campo (`isDeleted`), não uma ausência de documento, por
   /// isso ela também precisa ser recuperada: é o que faz uma nota arquivada
   /// em um aparelho continuar na lixeira em outro.
+  ///
+  /// A leitura exige [Source.server]. Por padrão o Firestore cai no cache
+  /// local quando não alcança o servidor e devolve um resultado **vazio sem
+  /// erro** — que o repositório interpretaria como "a nuvem não tem mais
+  /// essas notas" e apagaria as linhas locais já sincronizadas. Forçando a
+  /// origem, a falta de conexão vira uma exceção e a sincronização é
+  /// abortada sem destruir nada.
   Future<List<Note>> fetchNotes(String uid) async {
-    final snapshot = await _guard(
-      () => _notes(uid).get(),
+    final snapshot = await guard(
+      () => _notes(uid).get(const GetOptions(source: Source.server)),
       'Não foi possível baixar as notas da nuvem.',
     );
 
@@ -84,7 +101,7 @@ class FirestoreService {
   // ---------------------------------------------------------------------------
 
   Future<void> upsertCategory(NoteCategory category) async {
-    await _guard(
+    await guard(
       () => _categories(category.uid)
           .doc(category.id)
           .set(category.toRemoteMap()),
@@ -93,15 +110,17 @@ class FirestoreService {
   }
 
   Future<void> deleteCategory({required String uid, required String id}) async {
-    await _guard(
+    await guard(
       () => _categories(uid).doc(id).delete(),
       'Não foi possível excluir a categoria na nuvem.',
     );
   }
 
+  /// Baixa as categorias do usuário. Como em [fetchNotes], a leitura vem
+  /// obrigatoriamente do servidor.
   Future<List<NoteCategory>> fetchCategories(String uid) async {
-    final snapshot = await _guard(
-      () => _categories(uid).get(),
+    final snapshot = await guard(
+      () => _categories(uid).get(const GetOptions(source: Source.server)),
       'Não foi possível baixar as categorias da nuvem.',
     );
 
@@ -117,16 +136,41 @@ class FirestoreService {
   /// Executa a chamada ao Firestore convertendo qualquer falha em
   /// [CloudException].
   ///
-  /// Os três casos tratados:
+  /// ## Por que existe um timeout
+  ///
+  /// O SDK do Firestore **não lança erro** quando não consegue falar com o
+  /// servidor: ele grava a operação no próprio cache e fica retentando
+  /// indefinidamente. O `Future` devolvido por `set()` ou `delete()` só
+  /// completa quando o servidor confirma — ou seja, **nunca**, enquanto
+  /// durar o problema.
+  ///
+  /// Sem o timeout, um `await` aqui trava a tela para sempre: foi o que
+  /// aconteceu com o projeto sem a API do Firestore ativada, em que a lista
+  /// simplesmente deixava de responder em vez de avisar o usuário.
+  ///
+  /// Estourado o prazo, a operação é tratada como falta de conexão: ela
+  /// continua marcada como pendente no SQLite e será reenviada depois. Como
+  /// toda gravação é um `set()` sobre um ID fixo, reenviar é inofensivo
+  /// mesmo que a tentativa anterior acabe chegando ao servidor.
+  ///
+  /// Os casos tratados:
   ///
   /// * `unavailable` / `deadline-exceeded` -> sem internet ou servidor fora
   ///   do ar. É recuperável, então a operação continua pendente no SQLite.
   /// * `permission-denied` -> as regras de segurança recusaram o acesso
   ///   (por exemplo, tentativa de ler dados de outro usuário).
   /// * qualquer outro -> mensagem genérica, sem vazar detalhes do SDK.
-  Future<T> _guard<T>(Future<T> Function() action, String fallbackMessage) async {
+  @visibleForTesting
+  Future<T> guard<T>(Future<T> Function() action, String fallbackMessage) async {
     try {
-      return await action();
+      return await action().timeout(_timeout);
+    } on TimeoutException {
+      throw CloudException(
+        'O Firebase não respondeu a tempo. Suas alterações foram salvas no '
+        'aparelho e serão enviadas na próxima sincronização.',
+        isOffline: true,
+        code: 'timeout',
+      );
     } on FirebaseException catch (error) {
       switch (error.code) {
         case 'unavailable':
@@ -141,8 +185,9 @@ class FirestoreService {
 
         case 'permission-denied':
           throw CloudException(
-            'Acesso negado pelas regras de segurança do Firebase. '
-            'Entre novamente na sua conta e tente de novo.',
+            'Acesso negado pelo Firebase. Verifique se a API do Cloud '
+            'Firestore está ativada no projeto e se as regras de segurança '
+            'foram publicadas.',
             code: error.code,
           );
 
