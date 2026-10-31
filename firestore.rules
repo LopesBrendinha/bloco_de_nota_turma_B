@@ -1,0 +1,45 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function ehDono(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function textoAte(valor, limite) {
+      return valor is string && valor.size() <= limite;
+    }
+
+    function notaValida(uid) {
+      let nota = request.resource.data;
+      return nota.keys().hasOnly(['uid', 'titulo', 'conteudo', 'categoriaId',
+                                  'criadaEm', 'atualizadaEm', 'excluidaEm'])
+        && nota.uid == uid
+        && textoAte(nota.titulo, 200)
+        && textoAte(nota.conteudo, 50000)
+        && (nota.categoriaId == null || textoAte(nota.categoriaId, 100))
+        && nota.criadaEm is timestamp
+        && nota.atualizadaEm is timestamp
+        && (nota.excluidaEm == null || nota.excluidaEm is timestamp);
+    }
+
+    function categoriaValida(uid) {
+      let categoria = request.resource.data;
+      return categoria.keys().hasOnly(['uid', 'nome'])
+        && categoria.uid == uid
+        && categoria.nome is string
+        && categoria.nome.size() > 0
+        && categoria.nome.size() <= 40;
+    }
+
+    match /usuarios/{uid}/notas/{notaId} {
+      allow read, delete: if ehDono(uid);
+      allow create, update: if ehDono(uid) && notaValida(uid);
+    }
+
+    match /usuarios/{uid}/categorias/{categoriaId} {
+      allow read: if ehDono(uid);
+      allow create, update: if ehDono(uid) && categoriaValida(uid);
+    }
+  }
+}
