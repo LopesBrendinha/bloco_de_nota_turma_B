@@ -72,13 +72,19 @@ class DatabaseHelper {
     );
   }
 
-  Future<List<Note>> getNotes(String uid) async {
+  // Lista as notas do usuário. Se [search] não estiver vazio,
+  // retorna só as notas cujo título ou conteúdo contém o texto.
+  Future<List<Note>> getNotes(String uid, {String search = ''}) async {
     final db = await instance.database;
+
+    final term = search.trim();
 
     final result = await db.query(
       'notes',
-      where: 'uid = ?',
-      whereArgs: [uid],
+      where: term.isEmpty
+          ? 'uid = ?'
+          : 'uid = ? AND (title LIKE ? OR content LIKE ?)',
+      whereArgs: term.isEmpty ? [uid] : [uid, '%$term%', '%$term%'],
       orderBy: "id DESC",
     );
 
