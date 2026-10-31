@@ -16,7 +16,7 @@ class NotesPage extends StatefulWidget {
 }
 
 class _NotesPageState extends State<NotesPage> {
-  final DatabaseHelper database = DatabaseHelper.ínstance;
+  final DatabaseHelper database = DatabaseHelper.instance;
 
   final AuthService authService = AuthService();
 
