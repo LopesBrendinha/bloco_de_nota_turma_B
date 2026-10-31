@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../models/categories.dart';
 import '../models/note.dart';
 import '../services/auth_service.dart';
 import '../services/note_repository.dart';
@@ -21,6 +22,9 @@ class _NotesPageState extends State<NotesPage> {
   final AuthService authService = AuthService();
 
   List<Note> notes = [];
+
+  // Filtro de categoria da lista ('Todas' mostra tudo).
+  String selectedCategory = 'Todas';
 
   @override
   void initState() {
@@ -121,6 +125,11 @@ class _NotesPageState extends State<NotesPage> {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
 
+    // Notas que aparecem na tela, de acordo com o filtro escolhido.
+    final visibleNotes = selectedCategory == 'Todas'
+        ? notes
+        : notes.where((n) => n.category == selectedCategory).toList();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -166,9 +175,32 @@ class _NotesPageState extends State<NotesPage> {
               style: const TextStyle(color: Color(0xFF77717F), fontSize: 13),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 14),
 
-            if (notes.isEmpty)
+            // Filtro por categoria.
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: ['Todas', ...noteCategories].map((item) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      label: Text(item),
+                      selected: selectedCategory == item,
+                      onSelected: (_) {
+                        setState(() {
+                          selectedCategory = item;
+                        });
+                      },
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+
+            const SizedBox(height: 14),
+
+            if (visibleNotes.isEmpty)
               Expanded(
                 child: Center(
                   child: Column(
@@ -193,9 +225,11 @@ class _NotesPageState extends State<NotesPage> {
 
                       const SizedBox(height: 25),
 
-                      const Text(
-                        'Nenhuma nota ainda',
-                        style: TextStyle(
+                      Text(
+                        notes.isEmpty
+                            ? 'Nenhuma nota ainda'
+                            : 'Nenhuma nota nesta categoria',
+                        style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                         ),
@@ -214,10 +248,10 @@ class _NotesPageState extends State<NotesPage> {
             else
               Expanded(
                 child: ListView.builder(
-                  itemCount: notes.length,
+                  itemCount: visibleNotes.length,
 
                   itemBuilder: (context, index) {
-                    final note = notes[index];
+                    final note = visibleNotes[index];
 
                     return NoteCard(
                       note: note,

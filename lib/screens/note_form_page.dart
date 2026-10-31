@@ -1,3 +1,4 @@
+import 'package:blocodenotasturmab/models/categories.dart';
 import 'package:blocodenotasturmab/models/note.dart';
 import 'package:blocodenotasturmab/services/note_repository.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -19,6 +20,8 @@ class _NoteFormPageState extends State<NoteFormPage> {
 
   final repository = NoteRepository();
 
+  String category = 'Geral';
+
   bool saving = false;
 
   bool get isEditing => widget.note != null;
@@ -31,6 +34,8 @@ class _NoteFormPageState extends State<NoteFormPage> {
       titleController.text = widget.note!.title;
 
       contentController.text = widget.note!.content;
+
+      category = widget.note!.category;
     }
   }
 
@@ -62,7 +67,7 @@ class _NoteFormPageState extends State<NoteFormPage> {
         '${now.minute.toString().padLeft(2, '0')}';
 
     // Nota nova: o id é a hora atual em milissegundos (não repete
-    // entre instalações). Edição: mantém id, categoria e criação.
+    // entre instalações). Edição: mantém id e data de criação.
     final oldCreatedAt = widget.note?.createdAt ?? '';
 
     final note = Note(
@@ -71,7 +76,7 @@ class _NoteFormPageState extends State<NoteFormPage> {
       title: title,
       content: content,
       date: date,
-      category: widget.note?.category ?? 'Geral',
+      category: category,
       createdAt: oldCreatedAt.isEmpty ? nowIso : oldCreatedAt,
       updatedAt: nowIso,
     );
@@ -144,6 +149,25 @@ class _NoteFormPageState extends State<NoteFormPage> {
             ),
 
             const Divider(color: Color(0xFFE4DFEA)),
+
+            // Seleção da categoria da nota.
+            SizedBox(
+              width: double.infinity,
+              child: Wrap(
+                spacing: 8,
+                children: noteCategories.map((item) {
+                  return ChoiceChip(
+                    label: Text(item),
+                    selected: category == item,
+                    onSelected: (_) {
+                      setState(() {
+                        category = item;
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+            ),
 
             Expanded(
               child: TextField(
