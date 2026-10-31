@@ -1,72 +1,66 @@
-import 'dart:math';
-
-import 'package:blocodenotasturmab/screens/notes_page.dart';
-import 'package:blocodenotasturmab/screens/register_page.dart';
-import 'package:blocodenotasturmab/services/auth_service.dart';
+import 'package:blocodenotasturmab/servicos/servico_autenticacao.dart';
+import 'package:blocodenotasturmab/telas/pagina_cadastro.dart';
+import 'package:blocodenotasturmab/telas/pagina_notas.dart';
 import 'package:flutter/material.dart';
 
-class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+class PaginaLogin extends StatefulWidget {
+  const PaginaLogin({super.key});
 
   @override
-  State<LoginPage> createState() => _LoginPageState();
+  State<PaginaLogin> createState() => _PaginaLoginState();
 }
 
-class _LoginPageState extends State<LoginPage> {
-  final emailController = TextEditingController();
-  final passwordController = TextEditingController();
+class _PaginaLoginState extends State<PaginaLogin> {
+  final controladorEmail = TextEditingController();
+  final controladorSenha = TextEditingController();
 
-  final AuthService authService = AuthService();
+  final ServicoAutenticacao autenticacao = ServicoAutenticacao();
 
-  bool loading = false;
-  bool obscurePassword = true;
+  bool carregando = false;
+  bool ocultarSenha = true;
 
-  void showMessage(String message) {
+  void mostrarMensagem(String mensagem) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
+        content: Text(mensagem),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     );
   }
 
-  Future<void> login() async {
-    if (emailController.text.isEmpty || passwordController.text.isEmpty) {
-      showMessage("Preencha todos os campos");
+  Future<void> entrar() async {
+    if (controladorEmail.text.isEmpty || controladorSenha.text.isEmpty) {
+      mostrarMensagem("Preencha todos os campos");
       return;
     }
-    setState(() {
-      loading = true;
-    });
+    setState(() => carregando = true);
+
     try {
-      final user = await authService.login(
-        emailController.text.trim(),
-        passwordController.text.trim(),
+      final usuario = await autenticacao.entrar(
+        controladorEmail.text.trim(),
+        controladorSenha.text.trim(),
       );
 
-      if (user != null && mounted) {
+      if (usuario != null && mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => NotesPage()),
+          MaterialPageRoute(builder: (_) => const PaginaNotas()),
         );
       }
-    } catch (e) {
-      showMessage("Não foi posível realizar o login.");
+    } catch (erro) {
+      mostrarMensagem(ServicoAutenticacao.mensagemDeErro(erro));
     }
 
     if (mounted) {
-      setState(() {
-        loading = false;
-      });
+      setState(() => carregando = false);
     }
   }
 
   @override
   void dispose() {
-    emailController.dispose();
-    passwordController.dispose();
-
+    controladorEmail.dispose();
+    controladorSenha.dispose();
     super.dispose();
   }
 
@@ -119,7 +113,7 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 SizedBox(height: 8),
                 TextField(
-                  controller: emailController,
+                  controller: controladorEmail,
                   keyboardType: TextInputType.emailAddress,
                   decoration: InputDecoration(
                     hintText: "seu@email.com",
@@ -127,7 +121,6 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
                 SizedBox(height: 20),
-
                 Text(
                   "Senha",
                   style: TextStyle(
@@ -137,19 +130,17 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 SizedBox(height: 8),
                 TextField(
-                  controller: passwordController,
-                  obscureText: obscurePassword,
+                  controller: controladorSenha,
+                  obscureText: ocultarSenha,
                   decoration: InputDecoration(
                     hintText: "Digite sua senha",
                     prefixIcon: Icon(Icons.lock_outline),
                     suffixIcon: IconButton(
                       onPressed: () {
-                        setState(() {
-                          obscurePassword = !obscurePassword;
-                        });
+                        setState(() => ocultarSenha = !ocultarSenha);
                       },
                       icon: Icon(
-                        obscurePassword
+                        ocultarSenha
                             ? Icons.visibility_outlined
                             : Icons.visibility_off_outlined,
                       ),
@@ -158,8 +149,8 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 SizedBox(height: 30),
                 ElevatedButton(
-                  onPressed: loading ? null : login,
-                  child: loading
+                  onPressed: carregando ? null : entrar,
+                  child: carregando
                       ? SizedBox(
                           width: 24,
                           height: 24,
@@ -182,7 +173,9 @@ class _LoginPageState extends State<LoginPage> {
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => RegisterPage()),
+                        MaterialPageRoute(
+                          builder: (_) => const PaginaCadastro(),
+                        ),
                       );
                     },
                     child: Text("Ainda não possui uma conta? Cadastre-se"),
