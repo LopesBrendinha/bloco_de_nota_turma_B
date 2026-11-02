@@ -156,7 +156,10 @@ class AppTheme {
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: onSurface,
-        foregroundColor: GrafiteColors.highlighter,
+        // No escuro o botão fica claro (giz); amarelo sobre giz não tem contraste.
+        foregroundColor: brightness == Brightness.dark
+            ? GrafiteColors.ink
+            : GrafiteColors.highlighter,
         elevation: 2,
         shape: const RoundedRectangleBorder(borderRadius: corner),
       ),
