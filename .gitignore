@@ -58,3 +58,4 @@ firebase.*.local.json
 **/*service-account*.json
 **/firebase-adminsdk*.json
 test-results/
+android/.kotlin/
