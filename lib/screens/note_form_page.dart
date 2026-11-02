@@ -1,6 +1,6 @@
 
 
-import 'package:blocodenotasturmab/database/database_helper.dart';
+import 'package:blocodenotasturmab/repositories/note_repository.dart';
 import 'package:blocodenotasturmab/models/note.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -19,7 +19,9 @@ class _NoteFormPageState extends State<NoteFormPage> {
 
   final contentController = TextEditingController();
 
-  final database = DatabaseHelper.instance;
+  final repository = NoteRepository();
+
+  bool saving = false;
 
   bool get isEditing => widget.note != null;
 
@@ -51,6 +53,10 @@ class _NoteFormPageState extends State<NoteFormPage> {
       return;
     }
 
+    setState(() {
+      saving = true;
+    });
+
     // Criamos a data da alteração.
     final now = DateTime.now();
 
@@ -71,27 +77,26 @@ class _NoteFormPageState extends State<NoteFormPage> {
     //     o ID será null.
     final note = Note(
       id: widget.note?.id,
+      remoteId: widget.note?.remoteId,
       uid: user.uid,
       title: title,
       content: content,
       date: date,
     );
 
-    // Verificamos se estamos criando
-    // ou editando uma nota.
-    if (isEditing) {
-      // UPDATE
-      await database.updateNote(note);
-    } else {
-      // INSERT
-      await database.insertNote(note);
+    final sent = await repository.saveNote(note);
+
+    if (!mounted) return;
+
+    if (!sent) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Sem conexão: nota será sincronizada quando houver conexão.'),
+        ),
+      );
     }
 
-    // Depois de salvar,
-    // voltamos para a tela anterior.
-    if (mounted) {
-      Navigator.pop(context);
-    }
+    Navigator.pop(context);
   }
 
   @override
@@ -113,8 +118,14 @@ class _NoteFormPageState extends State<NoteFormPage> {
 
         actions: [
           IconButton(
-            onPressed: saveNote,
-            icon: const Icon(Icons.check_rounded),
+            onPressed: saving ? null : saveNote,
+            icon: saving ? 
+              const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2.0,)
+              )
+              : const Icon(Icons.save_rounded),
           ),
 
           const SizedBox(width: 8),

@@ -1,7 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-import '../database/database_helper.dart';
+import '../repositories/note_repository.dart';
 import '../models/note.dart';
 import '../services/auth_service.dart';
 import '../widgets/note_card.dart';
@@ -16,17 +16,20 @@ class NotesPage extends StatefulWidget {
 }
 
 class _NotesPageState extends State<NotesPage> {
-  final DatabaseHelper database = DatabaseHelper.instance;
+  final NoteRepository repository = NoteRepository();
 
   final AuthService authService = AuthService();
 
   List<Note> notes = [];
+
+  bool offline = false;
 
   @override
   void initState() {
     super.initState();
 
     loadNotes();
+    syncNotes();
   }
 
   Future<void> loadNotes() async {
@@ -42,7 +45,7 @@ class _NotesPageState extends State<NotesPage> {
     //
     // O banco irá buscar somente as notas
     // pertencentes a esse usuário.
-    final result = await database.getNotes(user.uid);
+    final result = await repository.getNotes(user.uid);
 
     if (mounted) {
       // Atualizamos a lista utilizada
@@ -53,25 +56,41 @@ class _NotesPageState extends State<NotesPage> {
     }
   }
 
-  Future<void> deleteNote(int id) async {
-    // Enviamos o ID da nota para o banco.
-    //
-    // O banco executará:
-    //
-    // DELETE FROM notes
-    // WHERE id = ?
-    //
-    // O ? será substituído pelo ID.
-    await database.deleteNote(id);
+  Future<void> syncNotes() async {
+    final user = FirebaseAuth.instance.currentUser;
 
-    // Depois de excluir,
-    // buscamos novamente as notas.
+    if (user == null) return;
+
+    final online = await repository.sync(user.uid);
+
     await loadNotes();
 
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Nota excluída.')));
+      setState(() {
+        offline = !online;
+      });
+    }
+  }
+
+  Future<void> deleteNote(Note note) async {
+    setState(() {
+      notes.remove(note);
+    });
+
+    final sent = await repository.deleteNote(note);
+
+    await loadNotes();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            sent
+              ? 'Nota excluída com sucesso.'
+              : 'Nota foi excluída localmente, e será removida do servidor quando houver conexão.',
+          )
+        )
+      );
     }
   }
 
@@ -125,6 +144,11 @@ class _NotesPageState extends State<NotesPage> {
 
         actions: [
           IconButton(
+            tooltip: 'Sincronizar',
+            onPressed: syncNotes,
+            icon: const Icon(Icons.sync_rounded)
+          ),
+          IconButton(
             tooltip: 'Sair',
             onPressed: logout,
             icon: const Icon(Icons.logout_rounded),
@@ -162,6 +186,29 @@ class _NotesPageState extends State<NotesPage> {
             ),
 
             const SizedBox(height: 20),
+
+            if (offline)
+              Container(
+                width: double.infinity,
+                margin: EdgeInsets.only(bottom: 20),
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Color(0xFFFFF4E5),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.cloud_off_rounded, color: Color(0xFFB26A00)),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Você está offline. Mostrando notas salvas no dispositivo.',
+                        style: TextStyle(color: Color(0xFF8A5300)),
+                      ),
+                    ),
+                  ]
+                )
+              ),
 
             if (notes.isEmpty)
               Expanded(
@@ -208,21 +255,22 @@ class _NotesPageState extends State<NotesPage> {
               )
             else
               Expanded(
-                child: ListView.builder(
-                  itemCount: notes.length,
+                child: RefreshIndicator(
+                  onRefresh: syncNotes,
+                  child: ListView.builder(
+                    itemCount: notes.length,
 
-                  itemBuilder: (context, index) {
-                    final note = notes[index];
+                    itemBuilder: (context, index) {
+                      final note = notes[index];
 
-                    return NoteCard(
-                      note: note,
-
-                      onTap: () => openEditNote(note),
-
-                      onDelete: () => deleteNote(note.id!),
-                    );
-                  },
-                ),
+                      return NoteCard(
+                        note: note,
+                        onTap: () => openEditNote(note),
+                        onDelete: () => deleteNote(note),
+                      );
+                    },
+                  ),
+                )
               ),
           ],
         ),
