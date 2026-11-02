@@ -3,7 +3,7 @@ import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
 class DatabaseHelper {
-  static final DatabaseHelper instace = DatabaseHelper._init();
+  static final DatabaseHelper instance = DatabaseHelper._init();
 
   static Database? _database;
 
@@ -23,61 +23,165 @@ class DatabaseHelper {
 
     final path = join(dbPath, fileName);
 
-    return await openDatabase(path, version: 1, onCreate: _createDB);
+    return await openDatabase(
+      path,
+      version: 2,
+      onCreate: _createDB,
+      onUpgrade: _upgradeDB,
+    );
   }
 
   Future<void> _createDB(Database db, int version) async {
     await db.execute('''
       CREATE TABLE notes(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id TEXT PRIMARY KEY,
         uid TEXT NOT NULL,
         title TEXT NOT NULL,
         content TEXT NOT NULL,
-        date TEXT NOT NULL
+        category TEXT NOT NULL DEFAULT 'Geral',
+        createdAt INTEGER NOT NULL,
+        updatedAt INTEGER NOT NULL,
+        deletedAt INTEGER,
+        synced INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE categories(
+        uid TEXT NOT NULL,
+        name TEXT NOT NULL,
+        PRIMARY KEY (uid, name)
       )
     ''');
   }
 
-  Future<int> insertNote(Note note) async {
-    final db = await instace.database;
-
-    return await db.insert('notes', note.toMap());
+  
+  Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    await db.execute('DROP TABLE IF EXISTS notes');
+    await db.execute('DROP TABLE IF EXISTS categories');
+    await _createDB(db, newVersion);
   }
 
-  Future<List<Note>> getNotes(String uid) async{
-    final db = await instace.database;
+ 
+  Future<void> upsertNote(Note note) async {
+    final db = await instance.database;
+
+    await db.insert(
+      'notes',
+      note.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  
+  Future<List<Note>> getNotes(
+    String uid, {
+    String query = '',
+    String? category,
+  }) async {
+    final db = await instance.database;
+
+    final where = StringBuffer('uid = ? AND deletedAt IS NULL');
+    final args = <Object?>[uid];
+
+    if (category != null && category.isNotEmpty) {
+      where.write(' AND category = ?');
+      args.add(category);
+    }
+
+    if (query.trim().isNotEmpty) {
+      where.write(' AND (title LIKE ? OR content LIKE ?)');
+      final like = '%${query.trim()}%';
+      args.addAll([like, like]);
+    }
+
+    final result = await db.query(
+      'notes',
+      where: where.toString(),
+      whereArgs: args,
+      orderBy: 'updatedAt DESC',
+    );
+
+    return result.map(Note.fromMap).toList();
+  }
+
+  /// Notas que estão na lixeira.
+  Future<List<Note>> getTrashedNotes(String uid) async {
+    final db = await instance.database;
+
+    final result = await db.query(
+      'notes',
+      where: 'uid = ? AND deletedAt IS NOT NULL',
+      whereArgs: [uid],
+      orderBy: 'deletedAt DESC',
+    );
+
+    return result.map(Note.fromMap).toList();
+  }
+
+  /// Todas as notas do usuário, inclusive as da lixeira.
+  /// Usado na sincronização.
+  Future<List<Note>> getAllNotes(String uid) async {
+    final db = await instance.database;
 
     final result = await db.query(
       'notes',
       where: 'uid = ?',
       whereArgs: [uid],
-      orderBy: "id DESC"
     );
 
-    return result.map((map)=>Note.fromMap(map)).toList();
+    return result.map(Note.fromMap).toList();
   }
 
-  Future<int> updateNote(Note note) async{
-    final db = await instace.database;
 
-    return await db.update(
+  Future<List<Note>> getUnsyncedNotes(String uid) async {
+    final db = await instance.database;
+
+    final result = await db.query(
       'notes',
-      note.toMap(),
-      where: "id = ?",
-
-      whereArgs: [note.id],
+      where: 'uid = ? AND synced = 0',
+      whereArgs: [uid],
     );
 
+    return result.map(Note.fromMap).toList();
   }
 
-  Future<int> deleteNote(int id) async{
-    final db = await instace.database;
+  Future<void> markAsSynced(String id) async {
+    final db = await instance.database;
 
-    return await db.delete(
-      'notes',
-      where: 'id = ?',
-      whereArgs: [id],
+    await db.update('notes', {'synced': 1}, where: 'id = ?', whereArgs: [id]);
+  }
+
+  
+  Future<void> deleteNotePermanently(String id) async {
+    final db = await instance.database;
+
+    await db.delete('notes', where: 'id = ?', whereArgs: [id]);
+  }
+
+ 
+
+  Future<List<String>> getCategories(String uid) async {
+    final db = await instance.database;
+
+    final result = await db.query(
+      'categories',
+      columns: ['name'],
+      where: 'uid = ?',
+      whereArgs: [uid],
+      orderBy: 'name COLLATE NOCASE',
     );
 
+    return result.map((row) => row['name'] as String).toList();
+  }
+
+  Future<void> insertCategory(String uid, String name) async {
+    final db = await instance.database;
+
+    await db.insert(
+      'categories',
+      {'uid': uid, 'name': name},
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
   }
 }

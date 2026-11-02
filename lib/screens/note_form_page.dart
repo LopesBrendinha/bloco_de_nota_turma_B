@@ -1,9 +1,8 @@
-
-
 import 'package:blocodenotasturmab/database/database_helper.dart';
 import 'package:blocodenotasturmab/models/note.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 
 class NoteFormPage extends StatefulWidget {
   final Note? note;
@@ -51,41 +50,31 @@ class _NoteFormPageState extends State<NoteFormPage> {
       return;
     }
 
-    // Criamos a data da alteração.
-    final now = DateTime.now();
+    // Momento da alteração, em milissegundos.
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
 
-    final date =
-        '${now.day.toString().padLeft(2, '0')}/'
-        '${now.month.toString().padLeft(2, '0')}/'
-        '${now.year} '
-        '${now.hour.toString().padLeft(2, '0')}:'
-        '${now.minute.toString().padLeft(2, '0')}';
-
-    // Criamos um objeto Note.
+    // Editando: mantemos o ID e a data de criação e atualizamos o resto.
+    // Criando: geramos um UUID novo, que será o mesmo ID no Firestore.
     //
-    // Se estamos editando:
-    //     widget.note?.id
-    // mantém o ID existente.
-    //
-    // Se estamos criando:
-    //     o ID será null.
-    final note = Note(
-      id: widget.note?.id,
-      uid: user.uid,
-      title: title,
-      content: content,
-      date: date,
-    );
+    // synced = false marca que a nota ainda precisa ser enviada à nuvem.
+    final note = isEditing
+        ? widget.note!.copyWith(
+            title: title,
+            content: content,
+            updatedAt: nowMs,
+            synced: false,
+          )
+        : Note(
+            id: const Uuid().v4(),
+            uid: user.uid,
+            title: title,
+            content: content,
+            createdAt: nowMs,
+            updatedAt: nowMs,
+          );
 
-    // Verificamos se estamos criando
-    // ou editando uma nota.
-    if (isEditing) {
-      // UPDATE
-      await database.updateNote(note);
-    } else {
-      // INSERT
-      await database.insertNote(note);
-    }
+    // O upsert cria a nota nova ou substitui a existente.
+    await database.upsertNote(note);
 
     // Depois de salvar,
     // voltamos para a tela anterior.

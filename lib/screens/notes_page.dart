@@ -16,7 +16,7 @@ class NotesPage extends StatefulWidget {
 }
 
 class _NotesPageState extends State<NotesPage> {
-  final DatabaseHelper database = DatabaseHelper.ínstance;
+  final DatabaseHelper database = DatabaseHelper.instance;
 
   final AuthService authService = AuthService();
 
@@ -53,16 +53,10 @@ class _NotesPageState extends State<NotesPage> {
     }
   }
 
-  Future<void> deleteNote(int id) async {
-    // Enviamos o ID da nota para o banco.
-    //
-    // O banco executará:
-    //
-    // DELETE FROM notes
-    // WHERE id = ?
-    //
-    // O ? será substituído pelo ID.
-    await database.deleteNote(id);
+  Future<void> deleteNote(String id) async {
+    // Por enquanto a exclusão é definitiva.
+    // Na etapa da lixeira, isso passa a mover a nota para lá.
+    await database.deleteNotePermanently(id);
 
     // Depois de excluir,
     // buscamos novamente as notas.
@@ -219,7 +213,7 @@ class _NotesPageState extends State<NotesPage> {
 
                       onTap: () => openEditNote(note),
 
-                      onDelete: () => deleteNote(note.id!),
+                      onDelete: () => deleteNote(note.id),
                     );
                   },
                 ),
