@@ -301,31 +301,55 @@ flutter test
 
 ## Capturas de tela
 
-As imagens ficam em `docs/screenshots/`.
+Capturas feitas em um celular Android com o APK de release e no console do Firebase do projeto `grafite-dwm4`. Os arquivos ficam em `docs/screenshots/`.
 
 ### Aplicativo
 
-| Login | Lista agrupada por data | Pesquisa com destaque |
+| Login | Cadastro | Lista agrupada por data |
 |---|---|---|
-| ![Login](docs/screenshots/login.png) | ![Lista](docs/screenshots/lista.png) | ![Pesquisa](docs/screenshots/pesquisa.png) |
+| ![Login](docs/screenshots/login.jpg) | ![Cadastro](docs/screenshots/cadastro.jpg) | ![Lista](docs/screenshots/lista.jpg) |
 
-| Editor com categoria | Ordenação por data | Categorias |
+| Pesquisa com destaque | Pesquisa no título e no conteúdo | Editor com pauta e categorias |
 |---|---|---|
-| ![Editor](docs/screenshots/editor.png) | ![Ordenação](docs/screenshots/ordenacao.png) | ![Categorias](docs/screenshots/categorias.png) |
+| ![Pesquisa](docs/screenshots/pesquisa.jpg) | ![Pesquisa com vários resultados](docs/screenshots/pesquisa-varias.jpg) | ![Editor](docs/screenshots/editor.jpg) |
 
-| Offline com pendências | Tema escuro |
-|---|---|
-| ![Offline](docs/screenshots/offline.png) | ![Escuro](docs/screenshots/escuro.png) |
+| Categorias | Nova categoria | Tema escuro |
+|---|---|---|
+| ![Categorias](docs/screenshots/categorias.jpg) | ![Nova categoria](docs/screenshots/nova-categoria.jpg) | ![Tema escuro](docs/screenshots/escuro.jpg) |
+
+### Funcionalidade adicional: ordenação por data
+
+| Escolha da ordenação | Por data de criação | Por última atualização (nota editada sobe) |
+|---|---|---|
+| ![Ordenação](docs/screenshots/ordenacao.jpg) | ![Por criação](docs/screenshots/ordenacao-criacao.jpg) | ![Por atualização](docs/screenshots/ordenacao-atualizacao.jpg) |
+
+### Sincronização e falta de conexão
+
+Em modo avião, a nota criada fica com o ícone de envio pendente, o indicador da barra superior mostra **1** alteração pendente, e a mensagem explica que os dados ficam salvos no aparelho. Ao voltar a conexão, a nota é enviada e o ícone some.
+
+![Offline com pendência](docs/screenshots/offline.jpg)
 
 ### Evidências no Firebase
 
-| Notas no Firestore | Categorias no Firestore |
-|---|---|
-| ![Firestore notas](docs/screenshots/firestore-notas.png) | ![Firestore categorias](docs/screenshots/firestore-categorias.png) |
+**Notas gravadas no Cloud Firestore** em `users/{uid}/notes`, com os mesmos ids (UUID) usados no SQLite. Ao lado aparece a subcoleção `categories`:
 
-| Usuários no Authentication | Regras publicadas | Simulador negando acesso de outro usuário |
-|---|---|---|
-| ![Auth](docs/screenshots/auth-usuarios.png) | ![Regras](docs/screenshots/regras.png) | ![Simulador](docs/screenshots/regras-simulador.png) |
+![Notas no Firestore](docs/screenshots/firestore-notas.png)
+
+**Authentication**: o usuário cadastrado pelo app e o provedor E-mail/senha ativado:
+
+| Usuários | Método de login |
+|---|---|
+| ![Usuários](docs/screenshots/auth-usuarios.png) | ![Método de login](docs/screenshots/auth-metodo.png) |
+
+**Regras de segurança publicadas**:
+
+![Regras publicadas](docs/screenshots/regras.png)
+
+**Simulador de regras**: o mesmo usuário autenticado tem a leitura **negada** nas notas de outro usuário (`users/abc123/...`) e **permitida** nas próprias notas:
+
+| Acesso a dados de outro usuário (negado) | Acesso aos próprios dados (permitido) |
+|---|---|
+| ![Negado](docs/screenshots/regras-simulador.png) | ![Permitido](docs/screenshots/regras-simulador-permitido.png) |
 
 ## O que mudou em relação ao projeto base
 
