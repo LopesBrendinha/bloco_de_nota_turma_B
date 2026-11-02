@@ -38,8 +38,8 @@ class _RegisterPageState extends State<RegisterPage> {
 
   Future<void> register() async {
     final email = emailController.text.trim();
-    final password = passwordController.text.trim();
-    final confirm = confirmPasswordController.text.trim();
+    final password = passwordController.text;
+    final confirm = confirmPasswordController.text;
 
     if (email.isEmpty || password.isEmpty || confirm.isEmpty) {
       showMessage("Preencha todos os campos");
@@ -47,6 +47,10 @@ class _RegisterPageState extends State<RegisterPage> {
     }
     if (password != confirm) {
       showMessage("As senhas não são iguais");
+      return;
+    }
+    if (password.length < 6) {
+      showMessage('A senha precisa ter pelo menos 6 caracteres.');
       return;
     }
 
@@ -58,11 +62,10 @@ class _RegisterPageState extends State<RegisterPage> {
       await authService.register(email, password);
 
       if (mounted) {
-        showMessage("Conta criada com sucesso!");
         Navigator.pop(context);
       }
     } catch (e) {
-      showMessage("Não foi possível criar a conta.");
+      if (mounted) showMessage(AuthService.errorMessage(e));
     }
 
     if (mounted) {
