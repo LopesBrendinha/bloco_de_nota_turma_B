@@ -1,5 +1,5 @@
 name: blocodenotasturmab
-description: "A new Flutter project."
+description: "Bloco de notas com SQLite e sincronização com Firebase."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -38,6 +38,7 @@ dependencies:
   firebase_auth: ^6.7.0
   sqflite: ^2.4.4+1
   path: ^1.9.1
+  cloud_firestore: ^6.10.2
 
 dev_dependencies:
   flutter_test:
@@ -49,6 +50,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  sqflite_common_ffi: ^2.4.5
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

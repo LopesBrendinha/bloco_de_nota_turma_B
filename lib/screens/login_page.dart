@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:blocodenotasturmab/screens/notes_page.dart';
 import 'package:blocodenotasturmab/screens/register_page.dart';
 import 'package:blocodenotasturmab/services/auth_service.dart';
@@ -22,6 +20,7 @@ class _LoginPageState extends State<LoginPage> {
   bool obscurePassword = true;
 
   void showMessage(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -42,17 +41,19 @@ class _LoginPageState extends State<LoginPage> {
     try {
       final user = await authService.login(
         emailController.text.trim(),
-        passwordController.text.trim(),
+        passwordController.text,
       );
 
       if (user != null && mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => NotesPage()),
+          MaterialPageRoute(
+            builder: (_) => NotesPage(uid: user.uid, email: user.email),
+          ),
         );
       }
     } catch (e) {
-      showMessage("Não foi posível realizar o login.");
+      showMessage("Não foi possível entrar. Confira os dados e sua conexão.");
     }
 
     if (mounted) {
@@ -179,12 +180,14 @@ class _LoginPageState extends State<LoginPage> {
                 SizedBox(height: 20),
                 Center(
                   child: TextButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => RegisterPage()),
-                      );
-                    },
+                    onPressed: loading
+                        ? null
+                        : () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => RegisterPage()),
+                            );
+                          },
                     child: Text("Ainda não possui uma conta? Cadastre-se"),
                   ),
                 ),

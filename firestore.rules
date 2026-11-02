@@ -1,0 +1,37 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid}/notes/{noteId} {
+      function owner() {
+        return request.auth != null && request.auth.uid == uid;
+      }
+
+      function validNote() {
+        let note = request.resource.data;
+        return note.keys().hasAll([
+          'uid', 'title', 'content', 'category', 'createdAt', 'updatedAt', 'archived', 'deleted'
+        ]) && note.keys().hasOnly([
+          'uid', 'title', 'content', 'category', 'createdAt', 'updatedAt', 'archived', 'deleted'
+        ])
+          && note.uid == uid
+          && note.title is string && note.title.size() <= 200
+          && note.content is string && note.content.size() <= 100000
+          && note.category is string && note.category.size() <= 40
+          && note.createdAt is int && note.createdAt > 0
+          && note.updatedAt is int && note.updatedAt >= note.createdAt
+          && note.archived is bool && note.deleted is bool
+          && (note.deleted
+            ? note.title == '' && note.content == '' && note.category == '' && !note.archived
+            : note.content.size() > 0 && note.category.size() > 0);
+      }
+
+      allow read: if owner();
+      allow create: if owner() && validNote();
+      allow update: if owner() && validNote()
+        && request.resource.data.createdAt == resource.data.createdAt
+        && !resource.data.deleted;
+      // A exclusão é registrada com deleted=true para alcançar outros aparelhos.
+      allow delete: if false;
+    }
+  }
+}

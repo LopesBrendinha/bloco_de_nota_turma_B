@@ -43,3 +43,17 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Configuração local e credenciais
+google-services*.json
+GoogleService-Info*.plist
+lib/firebase_options*.dart
+.firebaserc
+.firebase/
+firebase-debug.log
+firestore-debug.log
+*-firebase-adminsdk-*.json
+*service-account*.json
+.env
+.env.*
+node_modules/

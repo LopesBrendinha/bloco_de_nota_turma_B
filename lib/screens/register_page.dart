@@ -1,5 +1,6 @@
 import 'package:blocodenotasturmab/services/auth_service.dart';
 import 'package:flutter/material.dart';
+import 'notes_page.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -19,6 +20,7 @@ class _RegisterPageState extends State<RegisterPage> {
   bool obscurePassword = true;
 
   void showMessage(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -38,11 +40,15 @@ class _RegisterPageState extends State<RegisterPage> {
 
   Future<void> register() async {
     final email = emailController.text.trim();
-    final password = passwordController.text.trim();
-    final confirm = confirmPasswordController.text.trim();
+    final password = passwordController.text;
+    final confirm = confirmPasswordController.text;
 
     if (email.isEmpty || password.isEmpty || confirm.isEmpty) {
       showMessage("Preencha todos os campos");
+      return;
+    }
+    if (password.length < 6) {
+      showMessage('A senha precisa ter pelo menos 6 caracteres.');
       return;
     }
     if (password != confirm) {
@@ -55,11 +61,18 @@ class _RegisterPageState extends State<RegisterPage> {
     });
 
     try {
-      await authService.register(email, password);
+      final user = await authService.register(email, password);
+      if (user == null) throw StateError('O cadastro não retornou um usuário.');
 
       if (mounted) {
         showMessage("Conta criada com sucesso!");
-        Navigator.pop(context);
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(
+            builder: (_) => NotesPage(uid: user.uid, email: user.email),
+          ),
+          (route) => false,
+        );
       }
     } catch (e) {
       showMessage("Não foi possível criar a conta.");

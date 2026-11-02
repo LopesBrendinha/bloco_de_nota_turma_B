@@ -5,12 +5,14 @@ class NoteCard extends StatelessWidget {
   final Note note;
   final VoidCallback onTap;
   final VoidCallback onDelete;
+  final VoidCallback onArchive;
 
   const NoteCard({
     super.key,
     required this.note,
     required this.onTap,
     required this.onDelete,
+    required this.onArchive,
   });
 
   @override
@@ -22,7 +24,7 @@ class NoteCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 15,
             offset: Offset(0, 5),
           ),
@@ -68,18 +70,23 @@ class NoteCard extends StatelessWidget {
                     ),
                     SizedBox(height: 8),
                     Text(
-                      note.date,
+                      '${note.category} • ${note.date}',
                       style: TextStyle(fontSize: 11, color: Color(0xff9a94a1)),
                     ),
                   ],
                 ),
               ),
-              IconButton(
-                onPressed: onDelete,
-                icon: Icon(
-                  Icons.delete_outline_rounded,
-                  color: Color(0xffb45f6c),
-                ),
+              PopupMenuButton<String>(
+                tooltip: 'Opções da nota',
+                onSelected: (value) =>
+                    value == 'archive' ? onArchive() : onDelete(),
+                itemBuilder: (_) => [
+                  PopupMenuItem(
+                    value: 'archive',
+                    child: Text(note.archived ? 'Desarquivar' : 'Arquivar'),
+                  ),
+                  const PopupMenuItem(value: 'delete', child: Text('Excluir')),
+                ],
               ),
             ],
           ),
