@@ -1,0 +1,13 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Cada usuário só acessa a própria pasta: users/{seu uid}/notes/...
+    match /users/{userId}/notes/{noteId} {
+      allow read, delete: if request.auth != null
+                          && request.auth.uid == userId;
+      allow create, update: if request.auth != null
+                            && request.auth.uid == userId
+                            && request.resource.data.uid == userId;
+    }
+  }
+}
