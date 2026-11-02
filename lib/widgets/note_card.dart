@@ -68,6 +68,13 @@ class NoteCard extends StatelessWidget {
                     ),
                     SizedBox(height: 8),
                     Text(
+                      note.category,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 12, color: Color(0xff77717f)),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
                       note.date,
                       style: TextStyle(fontSize: 11, color: Color(0xff9a94a1)),
                     ),

@@ -25,7 +25,7 @@ class DatabaseHelper {
       return await databaseFactoryFfiWeb.openDatabase(
         fileName,
         options: OpenDatabaseOptions(
-          version: 2,
+          version: 3,
           onCreate: _createDB,
           onUpgrade: _upgradeDB,
         ),
@@ -38,7 +38,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -52,6 +52,7 @@ class DatabaseHelper {
         title TEXT NOT NULL,
         content TEXT NOT NULL,
         date TEXT NOT NULL,
+        category TEXT NOT NULL DEFAULT 'Sem categoria',
         remoteId TEXT,
         pendingSync INTEGER NOT NULL DEFAULT 1,
         deleted INTEGER NOT NULL DEFAULT 0,
@@ -78,6 +79,12 @@ class DatabaseHelper {
       );
       await db.execute(
         'CREATE UNIQUE INDEX notes_remote_id ON notes(uid, remoteId)',
+      );
+    }
+
+    if (oldVersion < 3) {
+      await db.execute(
+        "ALTER TABLE notes ADD COLUMN category TEXT NOT NULL DEFAULT 'Sem categoria'",
       );
     }
   }
@@ -109,10 +116,10 @@ class DatabaseHelper {
     final db = await database;
 
     final result = await db.rawUpdate(
-      'UPDATE notes SET title = ?, content = ?, date = ?, '
+      'UPDATE notes SET title = ?, content = ?, date = ?, category = ?, '
       'pendingSync = 1, revision = revision + 1 '
       'WHERE id = ? AND uid = ? AND deleted = 0',
-      [note.title, note.content, note.date, note.id, note.uid],
+      [note.title, note.content, note.date, note.category, note.id, note.uid],
     );
 
     if (result == 0) {

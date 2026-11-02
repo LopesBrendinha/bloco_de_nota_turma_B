@@ -5,8 +5,9 @@ import 'package:flutter/material.dart';
 
 class NoteFormPage extends StatefulWidget {
   final Note? note;
+  final List<String> categories;
 
-  const NoteFormPage({super.key, this.note});
+  const NoteFormPage({super.key, this.note, this.categories = const []});
 
   @override
   State<NoteFormPage> createState() => _NoteFormPageState();
@@ -20,12 +21,24 @@ class _NoteFormPageState extends State<NoteFormPage> {
   final database = DatabaseHelper.instance;
 
   bool saving = false;
+  String category = Note.defaultCategory;
+  List<String> categories = [];
 
   bool get isEditing => widget.note != null;
 
   @override
   void initState() {
     super.initState();
+
+    category = widget.note?.category ?? Note.defaultCategory;
+    categories = {
+      Note.defaultCategory,
+      'Estudos',
+      'Trabalho',
+      'Pessoal',
+      ...widget.categories,
+      category,
+    }.toList()..sort();
 
     if (isEditing) {
       titleController.text = widget.note!.title;
@@ -68,6 +81,7 @@ class _NoteFormPageState extends State<NoteFormPage> {
       title: title,
       content: content,
       date: date,
+      category: category,
     );
 
     setState(() {
@@ -93,6 +107,54 @@ class _NoteFormPageState extends State<NoteFormPage> {
         });
       }
     }
+  }
+
+  Future<void> addCategory() async {
+    String name = '';
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Nova categoria'),
+        content: TextField(
+          autofocus: true,
+          maxLength: 60,
+          decoration: const InputDecoration(hintText: 'Nome da categoria'),
+          onChanged: (value) => name = value,
+          onSubmitted: (value) => Navigator.pop(dialogContext, value.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, name.trim()),
+            child: const Text('Adicionar'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted || result == null) return;
+
+    if (result.isEmpty) {
+      showMessage('Digite o nome da categoria.');
+      return;
+    }
+
+    final matching = categories.where(
+      (item) => item.toLowerCase() == result.toLowerCase(),
+    );
+
+    setState(() {
+      if (matching.isNotEmpty) {
+        category = matching.first;
+      } else {
+        category = result;
+        categories.add(category);
+        categories.sort();
+      }
+    });
   }
 
   void showMessage(String message) {
@@ -157,6 +219,36 @@ class _NoteFormPageState extends State<NoteFormPage> {
                 filled: false,
                 contentPadding: EdgeInsets.symmetric(horizontal: 4),
               ),
+            ),
+
+            const SizedBox(height: 12),
+
+            Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    key: ValueKey(category),
+                    initialValue: category,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'Categoria'),
+                    items: categories.map((item) => DropdownMenuItem(
+                      value: item,
+                      child: Text(item, overflow: TextOverflow.ellipsis),
+                    )).toList(),
+                    onChanged: saving ? null : (value) {
+                      if (value == null) return;
+                      setState(() {
+                        category = value;
+                      });
+                    },
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Nova categoria',
+                  onPressed: saving ? null : addCategory,
+                  icon: const Icon(Icons.add),
+                ),
+              ],
             ),
 
             const Divider(color: Color(0xFFE4DFEA)),

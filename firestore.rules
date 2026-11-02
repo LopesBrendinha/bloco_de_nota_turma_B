@@ -11,12 +11,13 @@ service cloud.firestore {
           'uid', 'title', 'content', 'date', 'deleted', 'updatedAt'
         ])
         && note.keys().hasOnly([
-          'uid', 'title', 'content', 'date', 'deleted', 'updatedAt'
+          'uid', 'title', 'content', 'date', 'deleted', 'updatedAt', 'category'
         ])
         && note.uid == uid
         && note.title is string
         && note.content is string
         && note.date is string
+        && (!('category' in note) || note.category is string)
         && note.deleted is bool
         && note.updatedAt == request.time;
     }

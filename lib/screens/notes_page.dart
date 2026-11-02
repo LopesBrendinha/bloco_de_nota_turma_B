@@ -29,12 +29,20 @@ class _NotesPageState extends State<NotesPage> {
   bool synchronizing = false;
   bool syncAgain = false;
   String? syncMessage;
+  final searchController = TextEditingController();
+  String searchQuery = '';
 
   @override
   void initState() {
     super.initState();
 
     loadNotes();
+  }
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
   }
 
   Future<void> loadNotes() async {
@@ -178,7 +186,9 @@ class _NotesPageState extends State<NotesPage> {
   Future<void> openNewNote() async {
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const NoteFormPage()),
+      MaterialPageRoute(builder: (_) => NoteFormPage(
+        categories: notes.map((note) => note.category).toSet().toList(),
+      )),
     );
 
     await loadNotes();
@@ -187,7 +197,10 @@ class _NotesPageState extends State<NotesPage> {
   Future<void> openEditNote(Note note) async {
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => NoteFormPage(note: note)),
+      MaterialPageRoute(builder: (_) => NoteFormPage(
+        note: note,
+        categories: notes.map((note) => note.category).toSet().toList(),
+      )),
     );
 
     await loadNotes();
@@ -196,6 +209,9 @@ class _NotesPageState extends State<NotesPage> {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
+    final filteredNotes = notes.where(
+      (note) => note.matchesSearch(searchQuery),
+    ).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -257,6 +273,31 @@ class _NotesPageState extends State<NotesPage> {
 
             const SizedBox(height: 20),
 
+            TextField(
+              controller: searchController,
+              onChanged: (value) {
+                setState(() {
+                  searchQuery = value;
+                });
+              },
+              decoration: InputDecoration(
+                hintText: 'Pesquisar por título ou conteúdo',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: searchQuery.isEmpty ? null : IconButton(
+                  tooltip: 'Limpar pesquisa',
+                  icon: const Icon(Icons.clear),
+                  onPressed: () {
+                    searchController.clear();
+                    setState(() {
+                      searchQuery = '';
+                    });
+                  },
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
             if (loading)
               const Expanded(child: Center(child: CircularProgressIndicator()))
             else if (notes.isEmpty)
@@ -302,13 +343,17 @@ class _NotesPageState extends State<NotesPage> {
                   ),
                 ),
               )
+            else if (filteredNotes.isEmpty)
+              const Expanded(
+                child: Center(child: Text('Nenhuma nota encontrada.')),
+              )
             else
               Expanded(
                 child: ListView.builder(
-                  itemCount: notes.length,
+                  itemCount: filteredNotes.length,
 
                   itemBuilder: (context, index) {
-                    final note = notes[index];
+                    final note = filteredNotes[index];
 
                     return NoteCard(
                       note: note,
