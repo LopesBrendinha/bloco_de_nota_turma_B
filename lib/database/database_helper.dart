@@ -170,6 +170,12 @@ class DatabaseHelper {
           : !local.synced) {
         return;
       }
+      if (expectedChange == null &&
+          (note.updatedAt < local.updatedAt ||
+              (note.updatedAt == local.updatedAt &&
+                  note.changeId.compareTo(local.changeId) < 0))) {
+        return;
+      }
       await txn.update(
         'notes',
         note.copyWith(id: local.id, synced: true).toMap(),

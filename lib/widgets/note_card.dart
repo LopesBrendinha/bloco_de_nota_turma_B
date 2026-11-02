@@ -1,90 +1,126 @@
-import 'package:blocodenotasturmab/models/note.dart';
 import 'package:flutter/material.dart';
+import '../models/note.dart';
 
 class NoteCard extends StatelessWidget {
   final Note note;
   final VoidCallback onTap;
   final VoidCallback onDelete;
-
+  final VoidCallback onArchive;
   const NoteCard({
     super.key,
     required this.note,
     required this.onTap,
     required this.onDelete,
+    required this.onArchive,
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 15,
-            offset: Offset(0, 5),
-          ),
-        ],
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(22),
-        onTap: onTap,
-        child: Padding(
-          padding: EdgeInsets.all(20),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: Color(0xffede5fa),
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Icon(Icons.note_rounded, color: Color(0xff6c4ab6)),
+  Widget build(BuildContext context) => Card(
+    color: Colors.white,
+    elevation: 0,
+    margin: const EdgeInsets.only(bottom: 14),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(22),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 48,
+              decoration: BoxDecoration(
+                color: const Color(0xFFEDE5FA),
+                borderRadius: BorderRadius.circular(15),
               ),
-              SizedBox(width: 15),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      note.title.isEmpty ? "Sem Título" : note.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xff292333),
+              child: Icon(
+                note.archived ? Icons.archive_outlined : Icons.notes_rounded,
+                color: const Color(0xFF6C4AB6),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    note.title.isEmpty ? 'Sem título' : note.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF292333),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    note.content,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF77717F),
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    note.category,
+                    style: const TextStyle(
+                      color: Color(0xFF6C4AB6),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        note.date,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF77717F),
+                        ),
                       ),
-                    ),
-                    SizedBox(height: 5),
-                    Text(
-                      note.content,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: Color(0xff77717f), height: 1.4),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      note.date,
-                      style: TextStyle(fontSize: 11, color: Color(0xff9a94a1)),
-                    ),
-                  ],
-                ),
+                      Icon(
+                        note.synced
+                            ? Icons.cloud_done_outlined
+                            : Icons.cloud_upload_outlined,
+                        size: 15,
+                        color: note.synced
+                            ? const Color(0xFF588064)
+                            : const Color(0xFF9A7942),
+                      ),
+                      Text(
+                        note.synced ? 'Sincronizada' : 'Pendente',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF77717F),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              IconButton(
-                onPressed: onDelete,
-                icon: Icon(
-                  Icons.delete_outline_rounded,
-                  color: Color(0xffb45f6c),
+            ),
+            PopupMenuButton<String>(
+              tooltip: 'Opções da nota',
+              onSelected: (value) =>
+                  value == 'archive' ? onArchive() : onDelete(),
+              itemBuilder: (_) => [
+                PopupMenuItem(
+                  value: 'archive',
+                  child: Text(note.archived ? 'Desarquivar' : 'Arquivar'),
                 ),
-              ),
-            ],
-          ),
+                const PopupMenuItem(value: 'delete', child: Text('Excluir')),
+              ],
+            ),
+          ],
         ),
       ),
-    );
-  }
+    ),
+  );
 }

@@ -40,6 +40,9 @@ class SyncService extends ChangeNotifier {
             .send(note)
             .timeout(const Duration(seconds: 12));
         if (_disposed || !sessionIsActive()) return;
+        if (saved.uid != uid || saved.cloudId != note.cloudId) {
+          throw StateError('Resposta de sincronização inválida.');
+        }
         await database.acceptRemote(saved, expectedChange: note.changeId);
       }
       if (_disposed || !sessionIsActive()) return;
@@ -63,7 +66,11 @@ class SyncService extends ChangeNotifier {
     } finally {
       syncing = false;
       if (!_disposed) {
-        pending = (await database.pendingNotes(uid)).length;
+        try {
+          pending = (await database.pendingNotes(uid)).length;
+        } catch (_) {
+          error = 'Não foi possível consultar as alterações deste aparelho.';
+        }
         if (!_disposed) notifyListeners();
       }
     }

@@ -23,8 +23,9 @@ class FirestoreService implements NotesCloud {
         final remote = Note.fromCloud(snapshot.id, snapshot.data()!);
         if (remote.updatedAt > note.updatedAt ||
             (remote.updatedAt == note.updatedAt &&
-                remote.changeId.compareTo(note.changeId) > 0))
+                remote.changeId.compareTo(note.changeId) > 0)) {
           return remote;
+        }
       }
       transaction.set(reference, note.toCloud());
       return note.copyWith(synced: true);

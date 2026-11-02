@@ -1,0 +1,7 @@
+{
+  "FIREBASE_API_KEY": "copie-a-chave-publica-do-seu-app",
+  "FIREBASE_APP_ID": "copie-o-app-id-da-plataforma",
+  "FIREBASE_MESSAGING_SENDER_ID": "copie-o-sender-id",
+  "FIREBASE_PROJECT_ID": "seu-projeto",
+  "FIREBASE_AUTH_DOMAIN": "seu-projeto.firebaseapp.com"
+}
