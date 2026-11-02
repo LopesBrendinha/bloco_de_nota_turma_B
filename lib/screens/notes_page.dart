@@ -24,12 +24,46 @@ class _NotesPageState extends State<NotesPage> {
 
   bool offline = false;
 
+  String searchQuery = '';
+
   @override
   void initState() {
     super.initState();
 
     loadNotes();
     syncNotes();
+  }
+
+  String normalize(String text) {
+    const accents = {
+      'a': 'áàãâä',
+      'e': 'éèêë',
+      'i': 'íìîï',
+      'o': 'óòõôö',
+      'u': 'úùûü',
+      'c': 'ç',
+    };
+
+    var result = text.toLowerCase();
+
+    accents.forEach((letter, accented) {
+      for (var variant in accented.split('')) {
+        result = result.replaceAll(variant, letter);
+      }
+    });
+
+    return result;
+  }
+
+  List<Note> get filteredNotes {
+    final query = normalize(searchQuery.trim());
+
+    if (query.isEmpty) return notes;
+
+    return notes.where((note) {
+      return normalize(note.title).contains(query) ||
+          normalize(note.content).contains(query);
+    }).toList();
   }
 
   Future<void> loadNotes() async {
@@ -135,6 +169,8 @@ class _NotesPageState extends State<NotesPage> {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
 
+    final visibleNotes = filteredNotes;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -210,6 +246,21 @@ class _NotesPageState extends State<NotesPage> {
                 )
               ),
 
+            TextField(
+              decoration: InputDecoration(
+                hintText: 'Pesquisar notas...',
+                prefixIcon: Icon(Icons.search_rounded),
+              ),
+              onChanged: (value) {
+                setState(() {
+                  searchQuery = value;
+                });
+              },
+              onTapOutside: (_) => FocusScope.of(context).unfocus(),
+            ),
+
+            SizedBox(height: 20,),
+
             if (notes.isEmpty)
               Expanded(
                 child: Center(
@@ -253,15 +304,24 @@ class _NotesPageState extends State<NotesPage> {
                   ),
                 ),
               )
+            else if (visibleNotes.isEmpty)
+              Expanded(
+                child: Center(
+                  child: Text(
+                    'Nenhuma nota encontrada para a pesquisa "$searchQuery".',
+                    style: TextStyle(color: Color(0xFF77717F)),
+                  )
+                )
+              )
             else
               Expanded(
                 child: RefreshIndicator(
                   onRefresh: syncNotes,
                   child: ListView.builder(
-                    itemCount: notes.length,
+                    itemCount: visibleNotes.length,
 
                     itemBuilder: (context, index) {
-                      final note = notes[index];
+                      final note = visibleNotes[index];
 
                       return NoteCard(
                         note: note,
