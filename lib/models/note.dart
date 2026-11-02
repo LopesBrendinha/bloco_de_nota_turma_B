@@ -10,6 +10,7 @@ class Note {
 
   final String uid;
   final String title;
+  final String category;
   final String content;
   final String date;
 
@@ -29,6 +30,7 @@ class Note {
     this.remoteId,
     required this.uid,
     required this.title,
+    required this.category,
     required this.content,
     required this.date,
     int? updatedAt,
@@ -39,6 +41,7 @@ class Note {
   Note copyWith({
     int? id,
     String? remoteId,
+    String? category,
     bool? synced,
     bool? deleted,
   }) {
@@ -47,6 +50,7 @@ class Note {
       remoteId: remoteId ?? this.remoteId,
       uid: uid,
       title: title,
+      category: category ?? this.category,
       content: content,
       date: date,
       updatedAt: updatedAt,
@@ -63,6 +67,7 @@ class Note {
       'remote_id': remoteId,
       'uid' : uid,
       'title' : title,
+      'category' : category,
       'content' : content,
       'date' : date,
       'updated_at': updatedAt,
@@ -77,6 +82,7 @@ class Note {
       remoteId: map['remote_id'],
       uid: map['uid'],
       title: map['title'],
+      category: map['category'] ?? '',
       content: map['content'],
       date: map['date'],
       updatedAt: map['updated_at'] ?? 0,
@@ -91,6 +97,7 @@ class Note {
     return {
       'uid': uid,
       'title': title,
+      'category': category,
       'content': content,
       'date': date,
       'updatedAt': updatedAt,
@@ -102,6 +109,7 @@ class Note {
       remoteId: documentId,
       uid: data['uid'],
       title: data['title'] ?? '',
+      category: data['category'] ?? '',
       content: data['content'] ?? '',
       date: data['date'] ?? '',
       updatedAt: data['updatedAt'] ?? 0,

@@ -9,6 +9,8 @@ class NoteRepository {
   final DatabaseHelper _database = DatabaseHelper.instance;
   final FirestoreService _firestore = FirestoreService();
 
+  static const _defaultCategories = ['Estudos', 'Trabalho', 'Pessoal', 'Outros'];
+
   Future<List<Note>> getNotes(String uid) async {
     return _database.getNotes(uid);
   }
@@ -111,5 +113,17 @@ class NoteRepository {
     } on TimeoutException {
       return false;
     }
+  }
+
+  Future<List<String>> getCategories(String uid) async {
+    final saved = await _database.getCategories(uid);
+
+    final categories = <String, String>{};
+
+    for (final category in [..._defaultCategories, ...saved]) {
+      categories.putIfAbsent(category.toLowerCase(), () => category);
+    }
+
+    return categories.values.toList();
   }
 }

@@ -24,9 +24,10 @@ class DatabaseHelper {
     final path = join(dbPath, fileName);
 
     // Versão 2: adiciona as colunas de sincronização com o Firestore.
+    // Versão 3: adiciona a coluna de categoria.
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -43,6 +44,7 @@ class DatabaseHelper {
         content TEXT NOT NULL,
         date TEXT NOT NULL,
         updated_at INTEGER NOT NULL DEFAULT 0,
+        category TEXT NOT NULL DEFAULT '',
         synced INTEGER NOT NULL DEFAULT 0,
         deleted INTEGER NOT NULL DEFAULT 0
       )
@@ -63,6 +65,10 @@ class DatabaseHelper {
       await db.execute(
         'ALTER TABLE notes ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0',
       );
+    }
+
+    if (oldVersion < 3) {
+      await db.execute("ALTER TABLE notes ADD COLUMN category TEXT NOT NULL DEFAULT ''");
     }
   }
 
@@ -113,6 +119,17 @@ class DatabaseHelper {
     );
 
     return result.map((map) => Note.fromMap(map)).toList();
+  }
+
+  Future<List<String>> getCategories(String uid) async {
+    final db = await instance.database;
+
+    final result = await db.rawQuery(
+      'SELECT DISTINCT category FROM notes WHERE uid = ? AND deleted = 0 AND category != \'\'',
+      [uid],
+    );
+
+    return result.map((map) => map['category'] as String).toList();
   }
 
   // O filtro por uid garante que um usuário não altere
