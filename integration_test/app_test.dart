@@ -19,8 +19,9 @@ class ControlledCloud implements NotesCloud {
   bool offline = false;
 
   void checkConnection() {
-    if (offline)
+    if (offline) {
       throw FirebaseException(plugin: 'cloud_firestore', code: 'unavailable');
+    }
   }
 
   @override
