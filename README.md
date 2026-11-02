@@ -1,162 +1,162 @@
-# Bloco de Notas — Turma B
+# Bloco de Notas
 
-Continuação do projeto da professora: https://github.com/LopesBrendinha/bloco_de_nota_turma_B, a partir do commit 0a64a61. O aplicativo permite organizar notas e manter uma cópia no aparelho e outra no Firebase.
+## Objetivo
 
-Foram mantidos Flutter, as telas de login e cadastro, o visual roxo, o modelo Note, o banco DatabaseHelper e o uso de setState.
+Aplicativo para criar e organizar notas, mantendo os dados no aparelho com SQLite e sincronizando com o Cloud Firestore. O projeto foi desenvolvido a partir do [código da professora — Turma B](https://github.com/LopesBrendinha/bloco_de_nota_turma_B).
 
 ## Funcionalidades
 
-- Cadastro e login com e-mail e senha pelo Firebase Authentication.
-- Criação, consulta, edição e exclusão de notas no SQLite e no Cloud Firestore.
-- Categorias Estudos, Trabalho e Pessoal, com opção de criar outra no formulário.
-- Pesquisa por título ou conteúdo, sem diferenciar maiúsculas de minúsculas.
-- Notas separadas por usuário.
+- Cadastro e login com e-mail e senha.
+- Criação, consulta, edição e exclusão de notas.
+- Seleção de categorias, como Estudos, Trabalho e Pessoal, e criação de categorias no formulário da nota.
+- Pesquisa pelo título ou conteúdo.
+- Armazenamento local e sincronização com o Firebase.
 - Recuperação das notas da nuvem ao entrar em outra instalação.
-- Alterações sem conexão ficam pendentes no aparelho.
+- Separação das notas por usuário autenticado.
 
-As duas funcionalidades adicionais são:
+Foram implementadas duas funcionalidades adicionais:
 
-1. Ordenação por data: escolher data de criação ou última atualização, sempre da mais recente para a mais antiga.
-2. Arquivamento: arquivar e desarquivar sem perder o conteúdo. O filtro “Arquivadas” também permite pesquisar essas notas.
+- **Ordenação por data:** permite escolher entre data de criação e última atualização, exibindo as notas da mais recente para a mais antiga.
+- **Arquivamento:** permite arquivar uma nota, consultar as notas arquivadas e desarquivá-la mantendo seu conteúdo.
 
-Não há checklist, lembrete nem lixeira com recuperação. Excluir é definitivo. Arquivar mantém a nota.
+## Tecnologias e dependências
 
-## Tecnologias
+O aplicativo utiliza Flutter e Dart. As dependências estão em `pubspec.yaml`, e as versões resolvidas estão em `pubspec.lock`.
 
-Flutter e Dart; firebase_core, firebase_auth, cloud_firestore, sqflite e path. As versões estão em pubspec.yaml e pubspec.lock.
+| Dependência | Uso |
+| --- | --- |
+| `firebase_core` | Inicialização do Firebase. |
+| `firebase_auth` | Cadastro, login e encerramento da sessão. |
+| `cloud_firestore` | Leitura e gravação das notas na nuvem. |
+| `sqflite` | Banco SQLite no aparelho. |
+| `path` | Montagem do caminho do arquivo do banco. |
+| `cupertino_icons` | Biblioteca de ícones mantida da base. |
 
-Os testes usam flutter_test e sqflite_common_ffi. O package.json serve somente para testar as regras do Firestore; Node.js não faz parte do aplicativo.
+Os testes utilizam `flutter_test` e `sqflite_common_ffi`. O `package.json` contém as ferramentas de teste das regras do Firestore; Node.js não é necessário para executar o aplicativo.
 
-## Configuração e execução
+## Instalação e execução
 
-Use Flutter compatível com Dart 3.12.2 ou superior. Para Android, instale o Android Studio e prepare um emulador ou aparelho com depuração USB.
+A configuração foi preparada para Android. É necessário ter Flutter com Dart compatível com `^3.12.2`, Android SDK e um emulador ou aparelho Android com depuração USB.
+
+Clone a branch do projeto:
 
 ```sh
+git clone --branch melhorias-bloco-notas https://github.com/andrewbrtl/bloco_de_nota_turma_B.git BlocoDeNotas
+cd BlocoDeNotas
 flutter doctor
 flutter pub get
 ```
 
+Resolva os problemas de ambiente indicados pelo `flutter doctor`. Se houver licenças do Android pendentes, execute `flutter doctor --android-licenses` e leia os termos apresentados.
 
-Se o flutter doctor indicar licenças do Android pendentes, execute flutter doctor --android-licenses e leia os termos antes de aceitar.
+### Configuração do Firebase
 
-## Firebase
+1. Crie um projeto no [console do Firebase](https://console.firebase.google.com/) ou use um projeto ao qual tenha acesso.
+2. Em **Authentication**, habilite o provedor **E-mail/senha**.
+3. Em **Firestore Database**, crie o banco padrão `(default)`.
+4. Registre um aplicativo Android com o nome de pacote `com.example.blocodenotasturmab`.
+5. Baixe o arquivo `google-services.json` desse aplicativo e coloque-o em `android/app/google-services.json`.
+6. Na aba **Regras** do Firestore, substitua o conteúdo pelas regras do arquivo `firestore.rules` deste repositório e clique em **Publicar**.
 
-É necessário usar seu próprio projeto. A configuração do Firebase da professora foi retirada desta versão.
+O plugin Google Services já está configurado nos arquivos Gradle. A chamada `Firebase.initializeApp()` usa a configuração Android gerada a partir do JSON. Cada computador precisa receber seu próprio arquivo de configuração, que não é versionado.
 
-A configuração Android fica somente em android/app/google-services.json, fora do Git. O aplicativo chama Firebase.initializeApp(), que utiliza os recursos Android gerados pelo plugin Google Services a partir desse JSON. Não há chave nem identificador do projeto Firebase no código Dart versionado.
-
-Em outro computador, baixe o google-services.json do mesmo app Android e coloque-o em android/app/. Para usar outro projeto ou configurar outra plataforma, siga os passos abaixo.
-
-1. No console do Firebase: https://console.firebase.google.com/, crie um projeto.
-2. Em Authentication, habilite o provedor E-mail/senha.
-3. Em Firestore Database, crie o banco padrão (default), escolhendo uma região.
-4. Registre um app Android com o pacote com.example.blocodenotasturmab. Baixe o google-services.json e coloque-o em android/app/. O plugin Google Services já está configurado no Gradle.
-
-Para publicar as regras pelo terminal, instale a ferramenta abaixo. No Windows, use o CMD para os comandos do npm, como indicado nas instruções da professora.
+Com o Firebase configurado e o emulador ou aparelho conectado:
 
 ```sh
-npm install -g firebase-tools
-firebase login
-```
-
-Publique as regras fornecidas, trocando SEU_PROJETO pelo ID real do projeto:
-
-```sh
-firebase deploy --only firestore:rules --project=SEU_PROJETO
-```
-
-
-Também é possível copiar firestore.rules para a aba Regras do Firestore e clicar em Publicar. Não deixe regras que liberem o banco inteiro.
-
-Depois de configurar:
-
-```sh
-flutter pub get
 flutter devices
 flutter run -d ID_DO_DISPOSITIVO
 ```
 
+Substitua `ID_DO_DISPOSITIVO` pelo identificador Android apresentado pelo primeiro comando. Para gerar o APK de depuração:
 
-Substitua ID_DO_DISPOSITIVO pelo identificador Android exibido. Para iOS, registre o app no Firebase, adicione o GoogleService-Info.plist ao target Runner pelo Xcode e execute em um Mac. A configuração atual foi preparada para Android; iOS ainda precisa ser configurado e testado. A implementação de SQLite usada aqui é para Android/iOS; as pastas web da base não significam que o banco funcione no navegador.
+```sh
+flutter build apk --debug
+```
 
-A proteção dos dados depende da autenticação e das regras publicadas no Firebase. Manter a configuração fora do Git não substitui essas regras: o app compilado contém a configuração do cliente. Não coloque senha, chave privada ou arquivo de conta de serviço no repositório. Arquivos google-services*.json, GoogleService-Info*.plist, lib/firebase_options*.dart, .firebaserc, .env e arquivos comuns de conta de serviço estão no .gitignore. Cada ambiente deve receber sua configuração local.
+O APK fica em `build/app/outputs/flutter-apk/app-debug.apk`. As pastas de outras plataformas foram mantidas da base; esta configuração de execução é para Android. O SQLite utilizado não está configurado para funcionar no navegador.
 
-## Organização e alterações
+## Organização do projeto e alterações
 
-| Arquivo/pasta | Responsabilidade |
+A organização mantém a estrutura da professora, com telas, modelo, banco e serviços. As telas usam `StatefulWidget` e `setState` para atualizar a interface.
+
+| Arquivo ou componente | Responsabilidade e alterações |
 | --- | --- |
-| `lib/main.dart` | Inicia o Firebase, mantém o tema e abre as notas se já houver sessão. |
-| `lib/models/note.dart` | Representa a nota e converte seus dados para SQLite e Firestore. |
-| `lib/database/database_helper.dart` | CRUD local, categorias, busca, ordenação, arquivamento e migração do banco. |
-| `lib/services/auth_service.dart` | Login, cadastro e saída, como na base. |
-| `lib/services/firestore_service.dart` | Consulta e grava as notas do usuário no Firestore. |
-| `lib/services/sync_service.dart` | Envia as pendências e traz as notas da nuvem para o SQLite. |
-| `lib/screens/` | Telas de login, cadastro, listagem e formulário. |
-| `lib/widgets/note_card.dart` | Mostra a nota, a categoria, a data e o menu de ações. |
-| `firestore.rules` | Limita acesso ao dono e valida os campos. |
-| `test/` | Testes do banco, sincronização, formulário, cartão e regras. |
+| `lib/main.dart` | Inicializa o Firebase, configura o tema e verifica a sessão para abrir o login ou as notas. |
+| `lib/models/note.dart` | Representa a nota. Inclui categoria, identificação local e remota, datas, arquivamento e controle de sincronização. Converte os dados para SQLite e Firestore. |
+| `lib/database/database_helper.dart` | Executa as operações no SQLite, a pesquisa, a ordenação e o arquivamento. Também migra o banco anterior preservando as notas. |
+| `lib/services/auth_service.dart` | Centraliza cadastro, login e saída pelo Firebase Authentication. |
+| `lib/services/firestore_service.dart` | Consulta as notas na nuvem e grava as alterações usando transações. |
+| `lib/services/sync_service.dart` | Envia alterações pendentes, recupera notas remotas e trata erros de sincronização. |
+| `lib/screens/login_page.dart` e `register_page.dart` | Telas de autenticação e validação dos campos. |
+| `lib/screens/notes_page.dart` | Exibe as notas, a pesquisa, a ordenação, o filtro de arquivadas e o estado da sincronização. |
+| `lib/screens/note_form_page.dart` | Cria e edita notas, com seleção ou criação de categoria. |
+| `lib/widgets/note_card.dart` | Exibe o título, conteúdo, categoria, data e menu de ações da nota. |
+| `firestore.rules` | Define as permissões e validações dos documentos na nuvem. |
 
-A organização segue a base: telas, modelo, banco e serviços. DatabaseHelper.instance mantém o padrão Singleton usado pela professora, com uma instância do acesso ao banco para compartilhar a conexão entre as telas. Os serviços separam os comandos de autenticação e nuvem da interface. As telas continuam usando StatefulWidget e setState. Não foi acrescentado um gerenciador de estado.
+### Padrões adotados
 
-Também foram corrigidos os nomes divergentes da instância do banco na base. As senhas são enviadas como digitadas, sem remover espaços. Login, cadastro, gravação e sincronização tratam falhas e apresentam mensagens.
+O `DatabaseHelper` utiliza **Singleton**, por meio de `DatabaseHelper.instance`, para compartilhar uma instância de acesso ao banco entre as telas.
+
+Os serviços separam as operações de autenticação e sincronização da interface. O modelo `Note` concentra os campos da nota e sua conversão para os dois bancos. Essa separação mantém o acesso aos dados fora do código de apresentação das telas.
 
 ## Armazenamento e sincronização
 
-O SQLite continua sendo o banco consultado pelas telas. Cada nota tem o id local e um remoteId aleatório, usado também no Firestore:
+As telas consultam o SQLite. Ao criar, editar, arquivar ou excluir uma nota, a alteração é salva primeiro no aparelho e marcada como pendente de sincronização pelo campo `pendingSync`.
 
-users / UID_DO_USUARIO / notes / REMOTE_ID
+Cada nota tem um identificador local e um `remoteId`, utilizado no Firestore. Os documentos ficam no caminho:
 
-O documento guarda uid, title, content, category, createdAt, updatedAt, archived e deleted. As datas são números inteiros em microssegundos desde 1970. O campo pendingSync existe somente no SQLite.
+```text
+users/{uid}/notes/{remoteId}
+```
 
-1. Salvar, editar, arquivar ou excluir altera primeiro o SQLite e marca pendingSync = 1.
-2. Ao abrir as notas, voltar ao aplicativo, retornar do formulário ou usar o botão de sincronizar, o serviço tenta enviar as pendências daquele usuário.
-3. A gravação usa uma transação do Firestore. Só depois da resposta do servidor a pendência correspondente é retirada.
-4. O serviço consulta as notas do usuário no servidor e atualiza o SQLite. Assim, uma instalação nova recupera as notas já sincronizadas.
-5. Se uma nota for recusada por permissão ou dados inválidos, ela continua pendente, mas as outras notas ainda são enviadas e recuperadas. A tela informa a quantidade não enviada. Se houver um novo pedido durante uma sincronização, ele é executado depois da tentativa atual.
-6. Se ocorrer falha ou demora excessiva, o aplicativo informa o problema e mantém os dados locais. Após recuperar a conexão, use Sincronizar ou reabra o aplicativo. Não há tarefa de sincronização em segundo plano.
+A sincronização ocorre ao abrir a tela de notas, voltar ao aplicativo, retornar do formulário, realizar ações sobre as notas ou tocar no botão de sincronizar.
 
-Se a mesma nota for editada em dois aparelhos, fica a versão com maior updatedAt. Em empate, fica a versão já existente na nuvem. Isso depende do relógio dos aparelhos; mantenha data e hora automáticas. Uma edição feita enquanto outra está sendo enviada continua pendente para a próxima tentativa.
+1. O serviço busca as alterações pendentes do usuário no SQLite.
+2. Envia cada alteração ao Firestore e retira a pendência após a confirmação do servidor.
+3. Consulta as notas do usuário na nuvem e atualiza o banco local. Isso permite recuperar as notas em outra instalação.
 
-Na exclusão, título, conteúdo e categoria são apagados. Permanece um registro com deleted = true, sem opção de recuperação, para informar a exclusão a aparelhos que estavam desconectados. Uma exclusão prevalece sobre edições pendentes e não permite recriar a mesma nota. Esse registro não é uma lixeira.
+Se a mesma nota for editada em dois aparelhos, prevalece a versão com maior data de atualização. Em empate, permanece a versão da nuvem. Essa comparação depende do relógio dos aparelhos. Uma edição feita durante um envio permanece pendente para a próxima sincronização.
 
-As categorias personalizadas são guardadas junto com as notas. Uma categoria fica disponível nas próximas notas depois de salvar uma nota com ela. Não existe cadastro separado de categorias vazias. A pesquisa considera o título e o conteúdo das notas locais, incluindo as já recuperadas da nuvem; acentos continuam significativos.
+A exclusão apaga o título, conteúdo e categoria, mantendo um registro marcado como excluído para comunicar a operação aos outros aparelhos. A exclusão prevalece sobre edições antigas e não oferece recuperação. O arquivamento mantém o conteúdo e permite devolver a nota à lista principal.
 
-O banco foi atualizado da versão 1 para a 2 sem apagar as notas anteriores. Como a base guardava apenas uma data, a migração usa essa data como criação e atualização das notas antigas, atribui a categoria Pessoal e prepara o envio para a nuvem.
+A pesquisa compara o texto informado com o título e o conteúdo das notas locais, incluindo as recuperadas da nuvem, sem diferenciar maiúsculas e minúsculas. As categorias personalizadas são armazenadas junto com as notas e ficam disponíveis após salvar uma nota com a categoria.
+
+### Tratamento de erros
+
+Quando não há conexão ou o Firebase não responde, as alterações continuam no SQLite e a tela informa a falha. Depois de recuperar a conexão, o usuário pode tocar em **Sincronizar** ou reabrir o aplicativo.
+
+Se uma nota for recusada por dados inválidos ou falta de permissão, ela permanece pendente, enquanto as demais podem ser sincronizadas. A interface informa a sincronização parcial. Pedidos feitos durante um envio são retomados após a tentativa atual.
 
 ## Autenticação e segurança
 
-As consultas e alterações locais usam o UID. Na nuvem, firestore.rules permite acesso apenas quando o usuário autenticado é o dono do caminho users/{uid}/notes. As regras também validam os campos e impedem alterar o dono ou a data de criação.
+O Firebase Authentication identifica cada usuário pelo UID. As consultas locais usam esse identificador, e as regras do Firestore permitem acesso apenas ao usuário autenticado que corresponde ao dono do caminho `users/{uid}/notes`.
 
-É preciso conexão para criar uma conta ou fazer um novo login. Uma sessão já salva permite abrir as notas locais sem conexão. As notas pendentes só existem naquele aparelho até sincronizar; não desinstale o aplicativo antes disso. As regras do Firestore não criptografam o arquivo SQLite do aparelho.
+As regras também validam os campos e impedem a alteração do dono e da data de criação. Elas precisam estar publicadas no projeto Firebase utilizado para executar o aplicativo.
+
+O cadastro e um novo login precisam de internet. Uma sessão já salva permite acessar as notas locais sem conexão. Alterações ainda não sincronizadas dependem dos dados armazenados naquele aparelho.
+
+Arquivos de configuração local e credenciais são ignorados pelo Git. Não devem ser incluídos senhas, chaves privadas, tokens ou arquivos de conta de serviço. Manter o JSON fora do repositório não substitui as regras de acesso do Firestore.
 
 ## Testes
+
+Para executar a análise e os testes do aplicativo:
 
 ```sh
 flutter analyze
 flutter test
 ```
 
+Os testes verificam operações nas notas, categorias, pesquisa, ordenação, arquivamento, migração do banco, isolamento por usuário e situações de falha na sincronização. Utilizam SQLite em arquivos temporários e uma conexão remota simulada.
 
-Os testes de Flutter usam SQLite real em arquivos temporários e uma conexão simulada no lugar do Firestore. Verificam CRUD, pesquisa, isolamento por usuário, categorias, as duas ordenações, arquivamento, migração, falha de rede, recuperação em outro banco, exclusão pendente e edição durante um envio. Os testes de interface verificam as ações do cartão e o salvamento com categoria criada.
-
-Para conferir as regras em um emulador local, instale Node.js compatível com as dependências e Java 21:
+Para testar as regras do Firestore, com Node.js compatível com as dependências e Java 21 instalados:
 
 ```sh
 npm ci
 npm run test:rules
 ```
 
+Esses testes usam o emulador oficial do Firestore com um projeto fictício. Verificam as permissões por usuário e a validação dos documentos.
 
-Esse comando usa o projeto fictício demo-bloco-notas, sem acessar um projeto real. Testa o acesso do dono, a recusa de outros usuários e de usuários sem login, e a validação dos dados.
+## Capturas de tela
 
-Na revisão do código, a análise estática não apontou problemas e os 18 testes de Flutter passaram. Quatro testes das regras passaram no emulador do Firestore. O APK de depuração foi compilado e o aplicativo foi executado no emulador Android com o Firebase real. Ainda falta concluir os testes manuais de sincronização sem conexão, recuperação em outra instalação e isolamento entre contas. Os testes locais não substituem essas verificações.
-
-## Capturas e entrega
-
-Em 02/11/2026, foi confirmada a autenticação por e-mail e senha. O banco Firestore padrão foi criado na edição Standard, região nam5, com a faixa gratuita ativa. As regras foram publicadas e conferidas contra o arquivo firestore.rules do projeto.
-
-O aplicativo já exibiu a mensagem “Notas sincronizadas” no emulador Android. Ainda faltam incluir nesta seção as capturas das funcionalidades e dos documentos no console do Firestore. O roteiro e os nomes sugeridos estão em docs/evidencias/README.txt. A documentação da entrega estará completa após adicionar essas evidências.
-
-O fork está em https://github.com/andrewbrtl/bloco_de_nota_turma_B e o desenvolvimento está na branch melhorias-bloco-notas. Após configurar, testar e adicionar as capturas, abra o PR para a professora.
-
-O enunciado cita A e B em partes diferentes. Esta implementação segue a turma B, conforme a escolha do aluno. O destino previsto do fork e do PR é LopesBrendinha/bloco_de_nota_turma_B, branch main; confirme essa divergência com a professora antes da entrega. Envie no Classroom os links do fork e do PR, pois o enunciado menciona ambos.
+As capturas do aplicativo, incluindo ordenação por data e arquivamento, e as evidências das notas armazenadas no Firebase serão enviadas separadamente no Google Classroom, junto com os links do fork e do Pull Request.
