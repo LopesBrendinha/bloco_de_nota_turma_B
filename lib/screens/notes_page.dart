@@ -12,7 +12,8 @@ import '../widgets/note_card.dart';
 import 'note_form_page.dart';
 
 class NotesPage extends StatefulWidget {
-  const NotesPage({super.key});
+  final NotesCloud? cloud;
+  const NotesPage({super.key, this.cloud});
   @override
   State<NotesPage> createState() => _NotesPageState();
 }
@@ -38,7 +39,7 @@ class _NotesPageState extends State<NotesPage> with WidgetsBindingObserver {
     uid = FirebaseAuth.instance.currentUser!.uid;
     syncService = SyncService(
       database: database,
-      cloud: FirestoreService(),
+      cloud: widget.cloud ?? FirestoreService(),
       uid: uid,
       sessionIsActive: () => FirebaseAuth.instance.currentUser?.uid == uid,
     );

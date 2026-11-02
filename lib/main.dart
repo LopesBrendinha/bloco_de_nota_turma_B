@@ -8,6 +8,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 import 'screens/notes_page.dart';
+import 'services/firestore_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,7 +40,8 @@ Future<void> main() async {
 
 class MyApp extends StatelessWidget {
   final String? startupError;
-  const MyApp({super.key, this.startupError});
+  final NotesCloud? notesCloud;
+  const MyApp({super.key, this.startupError, this.notesCloud});
 
   @override
   Widget build(BuildContext context) {
@@ -101,13 +103,14 @@ class MyApp extends StatelessWidget {
                 ),
               ),
             )
-          : const AuthGate(),
+          : AuthGate(notesCloud: notesCloud),
     );
   }
 }
 
 class AuthGate extends StatelessWidget {
-  const AuthGate({super.key});
+  final NotesCloud? notesCloud;
+  const AuthGate({super.key, this.notesCloud});
 
   @override
   Widget build(BuildContext context) => StreamBuilder<User?>(
@@ -119,7 +122,7 @@ class AuthGate extends StatelessWidget {
       final user = snapshot.data;
       return user == null
           ? const LoginPage()
-          : NotesPage(key: ValueKey(user.uid));
+          : NotesPage(key: ValueKey(user.uid), cloud: notesCloud);
     },
   );
 }

@@ -1,0 +1,13 @@
+{
+  "name": "testes-bloco-de-notas",
+  "private": true,
+  "scripts": {
+    "emulators": "firebase emulators:start --project demo-bloco-notas",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-bloco-notas \"node --test test/firestore_rules.test.cjs\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.0",
+    "firebase": "^12.0.0",
+    "firebase-tools": "^15.0.0"
+  }
+}

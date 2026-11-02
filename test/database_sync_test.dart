@@ -287,4 +287,17 @@ void main() {
       expect(cloud.notes.values.single.content, 'Preservar este texto');
     },
   );
+
+  test(
+    'resposta antiga não sobrescreve versão já confirmada mais recente',
+    () async {
+      await db.saveNote(
+        note(updated: 3000, title: 'Versão nova').copyWith(synced: true),
+      );
+      await db.acceptRemote(
+        note(updated: 2000, title: 'Resposta atrasada').copyWith(synced: true),
+      );
+      expect((await db.getNotes('ana')).single.title, 'Versão nova');
+    },
+  );
 }
