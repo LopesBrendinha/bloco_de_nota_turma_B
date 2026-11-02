@@ -1,0 +1,52 @@
+rules_version = '2';
+
+// Cada usuário só lê e escreve dentro de users/{seu uid}. Qualquer outro
+// caminho é negado. Os campos são validados para impedir documentos
+// malformados ou com o uid de outra pessoa.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function hasValidTimestamps(data) {
+      return data.createdAt is int && data.updatedAt is int;
+    }
+
+    function isValidNote(userId) {
+      let data = request.resource.data;
+      return data.keys().hasOnly(['uid', 'title', 'content', 'categoryId', 'createdAt', 'updatedAt'])
+        && data.keys().hasAll(['uid', 'title', 'content', 'createdAt', 'updatedAt'])
+        && data.uid == userId
+        && data.title is string && data.title.size() <= 200
+        && data.content is string && data.content.size() <= 100000
+        && (data.get('categoryId', null) == null || data.categoryId is string)
+        && hasValidTimestamps(data);
+    }
+
+    function isValidCategory(userId) {
+      let data = request.resource.data;
+      return data.keys().hasOnly(['uid', 'name', 'color', 'createdAt', 'updatedAt'])
+        && data.keys().hasAll(['uid', 'name', 'color', 'createdAt', 'updatedAt'])
+        && data.uid == userId
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 30
+        && data.color is int && data.color >= 0
+        && hasValidTimestamps(data);
+    }
+
+    match /users/{userId}/notes/{noteId} {
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId) && isValidNote(userId);
+    }
+
+    match /users/{userId}/categories/{categoryId} {
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId) && isValidCategory(userId);
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
