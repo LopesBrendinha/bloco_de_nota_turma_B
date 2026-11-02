@@ -4,6 +4,10 @@ class Note {
   final String title;
   final String content;
   final String date;
+  final String? remoteId;
+  final bool pendingSync;
+  final bool deleted;
+  final int revision;
 
   Note({
     this.id,
@@ -11,6 +15,10 @@ class Note {
     required this.title,
     required this.content,
     required this.date,
+    this.remoteId,
+    this.pendingSync = true,
+    this.deleted = false,
+    this.revision = 0,
   });
 
   Map<String, dynamic> toMap(){
@@ -20,6 +28,10 @@ class Note {
       'title' : title,
       'content' : content,
       'date' : date,
+      'remoteId': remoteId,
+      'pendingSync': pendingSync ? 1 : 0,
+      'deleted': deleted ? 1 : 0,
+      'revision': revision,
     };
   }
 
@@ -30,6 +42,32 @@ class Note {
       title: map['title'],
       content: map['content'],
       date: map['date'],
+      remoteId: map['remoteId'],
+      pendingSync: (map['pendingSync'] ?? 1) == 1,
+      deleted: (map['deleted'] ?? 0) == 1,
+      revision: map['revision'] ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toCloudMap() {
+    return {
+      'uid': uid,
+      'title': deleted ? '' : title,
+      'content': deleted ? '' : content,
+      'date': date,
+      'deleted': deleted,
+    };
+  }
+
+  factory Note.fromCloud(String remoteId, Map<String, dynamic> map) {
+    return Note(
+      uid: map['uid'] as String,
+      title: map['title'] as String,
+      content: map['content'] as String,
+      date: map['date'] as String,
+      remoteId: remoteId,
+      pendingSync: false,
+      deleted: map['deleted'] as bool,
     );
   }
 
