@@ -1,4 +1,5 @@
 import 'package:blocodenotasturmab/database/database_helper.dart';
+import 'package:blocodenotasturmab/models/checklist_item.dart';
 import 'package:blocodenotasturmab/models/note.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -17,6 +18,9 @@ class _NoteFormPageState extends State<NoteFormPage> {
   final titleController = TextEditingController();
 
   final contentController = TextEditingController();
+  final checklistControllers = <TextEditingController>[];
+  final checklistFocusNodes = <FocusNode>[];
+  final checklistCompleted = <bool>[];
 
   final database = DatabaseHelper.instance;
 
@@ -45,6 +49,33 @@ class _NoteFormPageState extends State<NoteFormPage> {
 
       contentController.text = widget.note!.content;
     }
+
+    for (final item in widget.note?.checklist ?? <ChecklistItem>[]) {
+      addChecklistField(text: item.text, completed: item.completed);
+    }
+    addChecklistField();
+  }
+
+  void addChecklistField({String text = '', bool completed = false}) {
+    checklistControllers.add(TextEditingController(text: text));
+    checklistFocusNodes.add(FocusNode());
+    checklistCompleted.add(completed);
+  }
+
+  void removeChecklistItem(int index) {
+    if (index >= checklistControllers.length - 1) return;
+
+    final controller = checklistControllers[index];
+    final focusNode = checklistFocusNodes[index];
+    setState(() {
+      checklistControllers.removeAt(index);
+      checklistFocusNodes.removeAt(index);
+      checklistCompleted.removeAt(index);
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.dispose();
+      focusNode.dispose();
+    });
   }
 
   Future<void> saveNote() async {
@@ -60,9 +91,18 @@ class _NoteFormPageState extends State<NoteFormPage> {
     final title = titleController.text.trim();
 
     final content = contentController.text.trim();
+    final checklist = <ChecklistItem>[];
+    for (var index = 0; index < checklistControllers.length - 1; index++) {
+      final text = checklistControllers[index].text.trim();
+      if (text.isNotEmpty) {
+        checklist.add(
+          ChecklistItem(text: text, completed: checklistCompleted[index]),
+        );
+      }
+    }
 
-    if (content.isEmpty) {
-      showMessage('Escreva o conteúdo da nota antes de salvar.');
+    if (content.isEmpty && checklist.isEmpty) {
+      showMessage('Escreva uma nota ou adicione uma tarefa antes de salvar.');
       return;
     }
 
@@ -82,6 +122,7 @@ class _NoteFormPageState extends State<NoteFormPage> {
       content: content,
       date: date,
       category: category,
+      checklist: checklist,
     );
 
     setState(() {
@@ -169,6 +210,12 @@ class _NoteFormPageState extends State<NoteFormPage> {
   void dispose() {
     titleController.dispose();
     contentController.dispose();
+    for (final controller in checklistControllers) {
+      controller.dispose();
+    }
+    for (final focusNode in checklistFocusNodes) {
+      focusNode.dispose();
+    }
 
     super.dispose();
   }
@@ -231,16 +278,22 @@ class _NoteFormPageState extends State<NoteFormPage> {
                     initialValue: category,
                     isExpanded: true,
                     decoration: const InputDecoration(labelText: 'Categoria'),
-                    items: categories.map((item) => DropdownMenuItem(
-                      value: item,
-                      child: Text(item, overflow: TextOverflow.ellipsis),
-                    )).toList(),
-                    onChanged: saving ? null : (value) {
-                      if (value == null) return;
-                      setState(() {
-                        category = value;
-                      });
-                    },
+                    items: categories
+                        .map(
+                          (item) => DropdownMenuItem(
+                            value: item,
+                            child: Text(item, overflow: TextOverflow.ellipsis),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: saving
+                        ? null
+                        : (value) {
+                            if (value == null) return;
+                            setState(() {
+                              category = value;
+                            });
+                          },
                   ),
                 ),
                 IconButton(
@@ -254,29 +307,113 @@ class _NoteFormPageState extends State<NoteFormPage> {
             const Divider(color: Color(0xFFE4DFEA)),
 
             Expanded(
-              child: TextField(
-                controller: contentController,
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: contentController,
 
-                maxLines: null,
+                      maxLines: null,
+                      minLines: 4,
 
-                expands: true,
+                      textAlignVertical: TextAlignVertical.top,
 
-                textAlignVertical: TextAlignVertical.top,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        height: 1.5,
+                        color: Color(0xFF40394A),
+                      ),
 
-                style: const TextStyle(
-                  fontSize: 17,
-                  height: 1.5,
-                  color: Color(0xFF40394A),
-                ),
-
-                decoration: const InputDecoration(
-                  hintText: 'Comece a escrever...',
-                  border: InputBorder.none,
-                  filled: false,
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: 4,
-                    vertical: 15,
-                  ),
+                      decoration: const InputDecoration(
+                        hintText: 'Comece a escrever...',
+                        border: InputBorder.none,
+                        filled: false,
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 15,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Checklist',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF40394A),
+                      ),
+                    ),
+                    ...List.generate(checklistControllers.length, (index) {
+                      final isLast = index == checklistControllers.length - 1;
+                      return Row(
+                        key: ObjectKey(checklistControllers[index]),
+                        children: [
+                          if (isLast)
+                            const SizedBox(width: 48)
+                          else
+                            Checkbox(
+                              value: checklistCompleted[index],
+                              onChanged: saving
+                                  ? null
+                                  : (value) {
+                                      setState(() {
+                                        checklistCompleted[index] =
+                                            value ?? false;
+                                      });
+                                    },
+                            ),
+                          Expanded(
+                            child: TextField(
+                              controller: checklistControllers[index],
+                              focusNode: checklistFocusNodes[index],
+                              enabled: !saving,
+                              textInputAction: TextInputAction.next,
+                              style: TextStyle(
+                                decoration: checklistCompleted[index]
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                                color: const Color(0xFF40394A),
+                              ),
+                              decoration: InputDecoration(
+                                hintText: isLast
+                                    ? 'Adicionar tarefa...'
+                                    : 'Tarefa',
+                                border: InputBorder.none,
+                                filled: false,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 12,
+                                ),
+                              ),
+                              onChanged: (value) {
+                                if (index == checklistControllers.length - 1 &&
+                                    value.trim().isNotEmpty) {
+                                  setState(() {
+                                    addChecklistField();
+                                  });
+                                }
+                              },
+                              onSubmitted: (_) {
+                                if (index + 1 < checklistFocusNodes.length) {
+                                  checklistFocusNodes[index + 1].requestFocus();
+                                }
+                              },
+                            ),
+                          ),
+                          if (isLast)
+                            const SizedBox(width: 48)
+                          else
+                            IconButton(
+                              tooltip: 'Excluir tarefa',
+                              onPressed: saving
+                                  ? null
+                                  : () => removeChecklistItem(index),
+                              icon: const Icon(Icons.delete_outline_rounded),
+                            ),
+                        ],
+                      );
+                    }),
+                  ],
                 ),
               ),
             ),

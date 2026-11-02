@@ -61,7 +61,9 @@ class NoteCard extends StatelessWidget {
                     ),
                     SizedBox(height: 5),
                     Text(
-                      note.content,
+                      note.content.isNotEmpty
+                          ? note.content
+                          : note.checklist.map((item) => item.text).join('\n'),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(color: Color(0xff77717f), height: 1.4),

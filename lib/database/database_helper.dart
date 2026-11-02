@@ -25,7 +25,7 @@ class DatabaseHelper {
       return await databaseFactoryFfiWeb.openDatabase(
         fileName,
         options: OpenDatabaseOptions(
-          version: 3,
+          version: 4,
           onCreate: _createDB,
           onUpgrade: _upgradeDB,
         ),
@@ -38,7 +38,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -53,6 +53,7 @@ class DatabaseHelper {
         content TEXT NOT NULL,
         date TEXT NOT NULL,
         category TEXT NOT NULL DEFAULT 'Sem categoria',
+        checklist TEXT NOT NULL DEFAULT '[]',
         remoteId TEXT,
         pendingSync INTEGER NOT NULL DEFAULT 1,
         deleted INTEGER NOT NULL DEFAULT 0,
@@ -87,6 +88,12 @@ class DatabaseHelper {
         "ALTER TABLE notes ADD COLUMN category TEXT NOT NULL DEFAULT 'Sem categoria'",
       );
     }
+
+    if (oldVersion < 4) {
+      await db.execute(
+        "ALTER TABLE notes ADD COLUMN checklist TEXT NOT NULL DEFAULT '[]'",
+      );
+    }
   }
 
   Future<int> insertNote(Note note) async {
@@ -116,10 +123,11 @@ class DatabaseHelper {
     final db = await database;
 
     final result = await db.rawUpdate(
-      'UPDATE notes SET title = ?, content = ?, date = ?, category = ?, '
+      'UPDATE notes SET title = ?, content = ?, date = ?, category = ?, checklist = ?, '
       'pendingSync = 1, revision = revision + 1 '
       'WHERE id = ? AND uid = ? AND deleted = 0',
-      [note.title, note.content, note.date, note.category, note.id, note.uid],
+      [note.title, note.content, note.date, note.category,
+        note.toMap()['checklist'], note.id, note.uid],
     );
 
     if (result == 0) {
