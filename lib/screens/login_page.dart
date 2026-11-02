@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:blocodenotasturmab/screens/notes_page.dart';
 import 'package:blocodenotasturmab/screens/register_page.dart';
 import 'package:blocodenotasturmab/services/auth_service.dart';
@@ -22,6 +20,8 @@ class _LoginPageState extends State<LoginPage> {
   bool obscurePassword = true;
 
   void showMessage(String message) {
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -32,7 +32,10 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> login() async {
-    if (emailController.text.isEmpty || passwordController.text.isEmpty) {
+    if (loading) return;
+
+    if (emailController.text.trim().isEmpty ||
+        passwordController.text.isEmpty) {
       showMessage("Preencha todos os campos");
       return;
     }
@@ -42,7 +45,7 @@ class _LoginPageState extends State<LoginPage> {
     try {
       final user = await authService.login(
         emailController.text.trim(),
-        passwordController.text.trim(),
+        passwordController.text,
       );
 
       if (user != null && mounted) {
@@ -52,7 +55,9 @@ class _LoginPageState extends State<LoginPage> {
         );
       }
     } catch (e) {
-      showMessage("Não foi posível realizar o login.");
+      showMessage(
+        "Não foi possível realizar o login. Confira seus dados e a conexão.",
+      );
     }
 
     if (mounted) {

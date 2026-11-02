@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "363520809972",
-    "project_id": "bdbloco",
-    "storage_bucket": "bdbloco.firebasestorage.app"
+    "project_number": "92818701373",
+    "project_id": "bloco-7bf55",
+    "storage_bucket": "bloco-7bf55.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:363520809972:android:6a7d83d420af207e1637a1",
+        "mobilesdk_app_id": "1:92818701373:android:a040a6dc6d5961e599be54",
         "android_client_info": {
           "package_name": "com.example.blocodenotasturmab"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBxyB_nAaX3iEQdW-1h_z3DkCDjlLRzb2k"
+          "current_key": "AIzaSyB7txcViZEaqPojvM_n7alFJtDhdx3JUBM"
         }
       ],
       "services": {

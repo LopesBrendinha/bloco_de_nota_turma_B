@@ -1,9 +1,11 @@
 import 'package:blocodenotasturmab/models/note.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 
 class DatabaseHelper {
-  static final DatabaseHelper instace = DatabaseHelper._init();
+  static final DatabaseHelper instance = DatabaseHelper._init();
 
   static Database? _database;
 
@@ -19,6 +21,13 @@ class DatabaseHelper {
   }
 
   Future<Database> _initDB(String fileName) async {
+    if (kIsWeb) {
+      return await databaseFactoryFfiWeb.openDatabase(
+        fileName,
+        options: OpenDatabaseOptions(version: 1, onCreate: _createDB),
+      );
+    }
+
     final dbPath = await getDatabasesPath();
 
     final path = join(dbPath, fileName);
@@ -39,45 +48,43 @@ class DatabaseHelper {
   }
 
   Future<int> insertNote(Note note) async {
-    final db = await instace.database;
+    final db = await database;
 
     return await db.insert('notes', note.toMap());
   }
 
-  Future<List<Note>> getNotes(String uid) async{
-    final db = await instace.database;
+  Future<List<Note>> getNotes(String uid) async {
+    final db = await database;
 
     final result = await db.query(
       'notes',
       where: 'uid = ?',
       whereArgs: [uid],
-      orderBy: "id DESC"
+      orderBy: "id DESC",
     );
 
-    return result.map((map)=>Note.fromMap(map)).toList();
+    return result.map((map) => Note.fromMap(map)).toList();
   }
 
-  Future<int> updateNote(Note note) async{
-    final db = await instace.database;
+  Future<int> updateNote(Note note) async {
+    final db = await database;
 
     return await db.update(
       'notes',
       note.toMap(),
-      where: "id = ?",
+      where: "id = ? AND uid = ?",
 
-      whereArgs: [note.id],
+      whereArgs: [note.id, note.uid],
     );
-
   }
 
-  Future<int> deleteNote(int id) async{
-    final db = await instace.database;
+  Future<int> deleteNote(int id, String uid) async {
+    final db = await database;
 
     return await db.delete(
       'notes',
-      where: 'id = ?',
-      whereArgs: [id],
+      where: 'id = ? AND uid = ?',
+      whereArgs: [id, uid],
     );
-
   }
 }

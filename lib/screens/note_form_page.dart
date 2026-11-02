@@ -1,5 +1,3 @@
-
-
 import 'package:blocodenotasturmab/database/database_helper.dart';
 import 'package:blocodenotasturmab/models/note.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -21,6 +19,8 @@ class _NoteFormPageState extends State<NoteFormPage> {
 
   final database = DatabaseHelper.instance;
 
+  bool saving = false;
+
   bool get isEditing => widget.note != null;
 
   @override
@@ -35,23 +35,24 @@ class _NoteFormPageState extends State<NoteFormPage> {
   }
 
   Future<void> saveNote() async {
-    // Pegamos o usuário atualmente autenticado.
+    if (saving) return;
+
     final user = FirebaseAuth.instance.currentUser;
 
-    // Sem usuário não podemos salvar.
-    if (user == null) return;
+    if (user == null) {
+      showMessage('Entre na sua conta para salvar a nota.');
+      return;
+    }
 
-    // Pegamos os valores digitados.
     final title = titleController.text.trim();
 
     final content = contentController.text.trim();
 
-    // Verificamos se existe conteúdo.
     if (content.isEmpty) {
+      showMessage('Escreva o conteúdo da nota antes de salvar.');
       return;
     }
 
-    // Criamos a data da alteração.
     final now = DateTime.now();
 
     final date =
@@ -61,14 +62,6 @@ class _NoteFormPageState extends State<NoteFormPage> {
         '${now.hour.toString().padLeft(2, '0')}:'
         '${now.minute.toString().padLeft(2, '0')}';
 
-    // Criamos um objeto Note.
-    //
-    // Se estamos editando:
-    //     widget.note?.id
-    // mantém o ID existente.
-    //
-    // Se estamos criando:
-    //     o ID será null.
     final note = Note(
       id: widget.note?.id,
       uid: user.uid,
@@ -77,21 +70,37 @@ class _NoteFormPageState extends State<NoteFormPage> {
       date: date,
     );
 
-    // Verificamos se estamos criando
-    // ou editando uma nota.
-    if (isEditing) {
-      // UPDATE
-      await database.updateNote(note);
-    } else {
-      // INSERT
-      await database.insertNote(note);
-    }
+    setState(() {
+      saving = true;
+    });
 
-    // Depois de salvar,
-    // voltamos para a tela anterior.
-    if (mounted) {
-      Navigator.pop(context);
+    try {
+      if (isEditing) {
+        await database.updateNote(note);
+      } else {
+        await database.insertNote(note);
+      }
+
+      if (mounted) {
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      showMessage('Não foi possível salvar a nota. Tente novamente.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          saving = false;
+        });
+      }
     }
+  }
+
+  void showMessage(String message) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -113,8 +122,15 @@ class _NoteFormPageState extends State<NoteFormPage> {
 
         actions: [
           IconButton(
-            onPressed: saveNote,
-            icon: const Icon(Icons.check_rounded),
+            tooltip: 'Salvar nota',
+            onPressed: saving ? null : saveNote,
+            icon: saving
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.check_rounded),
           ),
 
           const SizedBox(width: 8),

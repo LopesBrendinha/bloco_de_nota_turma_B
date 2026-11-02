@@ -19,6 +19,8 @@ class _RegisterPageState extends State<RegisterPage> {
   bool obscurePassword = true;
 
   void showMessage(String message) {
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -37,9 +39,11 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Future<void> register() async {
+    if (loading) return;
+
     final email = emailController.text.trim();
-    final password = passwordController.text.trim();
-    final confirm = confirmPasswordController.text.trim();
+    final password = passwordController.text;
+    final confirm = confirmPasswordController.text;
 
     if (email.isEmpty || password.isEmpty || confirm.isEmpty) {
       showMessage("Preencha todos os campos");
@@ -47,6 +51,11 @@ class _RegisterPageState extends State<RegisterPage> {
     }
     if (password != confirm) {
       showMessage("As senhas não são iguais");
+      return;
+    }
+
+    if (password.length < 6) {
+      showMessage("A senha deve ter pelo menos 6 caracteres.");
       return;
     }
 

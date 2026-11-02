@@ -16,11 +16,12 @@ class NotesPage extends StatefulWidget {
 }
 
 class _NotesPageState extends State<NotesPage> {
-  final DatabaseHelper database = DatabaseHelper.ínstance;
+  final DatabaseHelper database = DatabaseHelper.instance;
 
   final AuthService authService = AuthService();
 
   List<Note> notes = [];
+  bool loading = true;
 
   @override
   void initState() {
@@ -30,85 +31,86 @@ class _NotesPageState extends State<NotesPage> {
   }
 
   Future<void> loadNotes() async {
-    // Recuperamos o usuário atualmente
-    // autenticado no Firebase.
-    final user = FirebaseAuth.instance.currentUser;
+    if (!mounted) return;
 
-    // Se não houver usuário,
-    // não podemos buscar as notas.
+    final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    // Enviamos o UID para o banco local.
-    //
-    // O banco irá buscar somente as notas
-    // pertencentes a esse usuário.
-    final result = await database.getNotes(user.uid);
+    setState(() {
+      loading = true;
+    });
 
-    if (mounted) {
-      // Atualizamos a lista utilizada
-      // pela interface.
-      setState(() {
-        notes = result;
-      });
+    try {
+      final result = await database.getNotes(user.uid);
+
+      if (mounted) {
+        setState(() {
+          notes = result;
+        });
+      }
+    } catch (e) {
+      showMessage('Não foi possível carregar as notas.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          loading = false;
+        });
+      }
     }
   }
 
+  void showMessage(String message) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   Future<void> deleteNote(int id) async {
-    // Enviamos o ID da nota para o banco.
-    //
-    // O banco executará:
-    //
-    // DELETE FROM notes
-    // WHERE id = ?
-    //
-    // O ? será substituído pelo ID.
-    await database.deleteNote(id);
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
 
-    // Depois de excluir,
-    // buscamos novamente as notas.
-    await loadNotes();
-
-    if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Nota excluída.')));
+    try {
+      await database.deleteNote(id, user.uid);
+      await loadNotes();
+      showMessage('Nota excluída.');
+    } catch (e) {
+      showMessage('Não foi possível excluir a nota.');
     }
   }
 
   Future<void> logout() async {
-    await authService.logout();
+    try {
+      await authService.logout();
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const LoginPage()),
-      (route) => false,
-    );
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+        (route) => false,
+      );
+    } catch (e) {
+      showMessage('Não foi possível sair da conta.');
+    }
   }
 
   Future<void> openNewNote() async {
-    // Abre a tela responsável pelo formulário.
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const NoteFormPage()),
     );
 
-    // Quando o usuário voltar para essa página,
-    // buscamos novamente as notas.
     await loadNotes();
   }
 
   Future<void> openEditNote(Note note) async {
-    // Passamos a nota selecionada
-    // para a tela de edição.
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => NoteFormPage(note: note)),
     );
 
-    // Quando retornar da edição,
-    // atualizamos a lista.
     await loadNotes();
   }
 
@@ -163,7 +165,9 @@ class _NotesPageState extends State<NotesPage> {
 
             const SizedBox(height: 20),
 
-            if (notes.isEmpty)
+            if (loading)
+              const Expanded(child: Center(child: CircularProgressIndicator()))
+            else if (notes.isEmpty)
               Expanded(
                 child: Center(
                   child: Column(
