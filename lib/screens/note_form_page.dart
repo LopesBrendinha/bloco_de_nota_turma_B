@@ -1,178 +1,275 @@
-
-
-import 'package:blocodenotasturmab/database/database_helper.dart';
+import 'package:blocodenotasturmab/controllers/notes_controller.dart';
 import 'package:blocodenotasturmab/models/note.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:blocodenotasturmab/theme/app_theme.dart';
+import 'package:blocodenotasturmab/utils/date_utils.dart';
+import 'package:blocodenotasturmab/widgets/category_dialog.dart';
+import 'package:blocodenotasturmab/widgets/ruled_paper.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class NoteFormPage extends StatefulWidget {
-  final Note? note;
+  const NoteFormPage({super.key, required this.controller, this.note});
 
-  const NoteFormPage({super.key, this.note});
+  final NotesController controller;
+  final Note? note;
 
   @override
   State<NoteFormPage> createState() => _NoteFormPageState();
 }
 
 class _NoteFormPageState extends State<NoteFormPage> {
-  final titleController = TextEditingController();
+  static const _fontSize = 17.0;
+  static const _lineHeight = 1.6;
 
+  final titleController = TextEditingController();
   final contentController = TextEditingController();
 
-  final database = DatabaseHelper.instance;
+  /// Versão salva mais recente (null enquanto a nota nova não foi gravada).
+  Note? saved;
+  String? categoryId;
 
-  bool get isEditing => widget.note != null;
+  NotesController get controller => widget.controller;
 
   @override
   void initState() {
     super.initState();
-
-    if (isEditing) {
-      titleController.text = widget.note!.title;
-
-      contentController.text = widget.note!.content;
+    saved = widget.note;
+    if (saved != null) {
+      titleController.text = saved!.title;
+      contentController.text = saved!.content;
+      categoryId = saved!.categoryId;
+    } else {
+      // Nota nova criada com um filtro ativo já nasce naquela categoria.
+      categoryId = controller.categoryId;
     }
   }
 
-  Future<void> saveNote() async {
-    // Pegamos o usuário atualmente autenticado.
-    final user = FirebaseAuth.instance.currentUser;
-
-    // Sem usuário não podemos salvar.
-    if (user == null) return;
-
-    // Pegamos os valores digitados.
+  bool get hasChanges {
     final title = titleController.text.trim();
-
     final content = contentController.text.trim();
+    if (saved == null) return title.isNotEmpty || content.isNotEmpty;
+    return title != saved!.title ||
+        content != saved!.content ||
+        categoryId != saved!.categoryId;
+  }
 
-    // Verificamos se existe conteúdo.
-    if (content.isEmpty) {
+  /// Salva no SQLite (e agenda o envio ao Firestore) se algo mudou.
+  Future<void> save() async {
+    if (!hasChanges) return;
+    saved = await controller.saveNote(
+      existing: saved,
+      title: titleController.text.trim(),
+      content: contentController.text.trim(),
+      categoryId: categoryId,
+    );
+  }
+
+  Future<void> saveAndClose() async {
+    await save();
+    if (mounted) Navigator.pop(context);
+  }
+
+  Future<void> delete() async {
+    final note = saved;
+    if (note == null) {
+      Navigator.pop(context);
       return;
     }
-
-    // Criamos a data da alteração.
-    final now = DateTime.now();
-
-    final date =
-        '${now.day.toString().padLeft(2, '0')}/'
-        '${now.month.toString().padLeft(2, '0')}/'
-        '${now.year} '
-        '${now.hour.toString().padLeft(2, '0')}:'
-        '${now.minute.toString().padLeft(2, '0')}';
-
-    // Criamos um objeto Note.
-    //
-    // Se estamos editando:
-    //     widget.note?.id
-    // mantém o ID existente.
-    //
-    // Se estamos criando:
-    //     o ID será null.
-    final note = Note(
-      id: widget.note?.id,
-      uid: user.uid,
-      title: title,
-      content: content,
-      date: date,
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Apagar nota?'),
+        content: const Text('A nota será removida deste aparelho e da nuvem.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: GrafiteColors.eraser),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Apagar'),
+          ),
+        ],
+      ),
     );
+    if (confirm != true) return;
+    await controller.deleteNote(note);
+    if (mounted) Navigator.pop(context);
+  }
 
-    // Verificamos se estamos criando
-    // ou editando uma nota.
-    if (isEditing) {
-      // UPDATE
-      await database.updateNote(note);
-    } else {
-      // INSERT
-      await database.insertNote(note);
-    }
-
-    // Depois de salvar,
-    // voltamos para a tela anterior.
-    if (mounted) {
-      Navigator.pop(context);
-    }
+  Future<void> createCategory() async {
+    final result = await showCategoryDialog(context);
+    if (result == null) return;
+    final category = await controller.saveCategory(
+      name: result.$1,
+      color: result.$2,
+    );
+    setState(() => categoryId = category.id);
   }
 
   @override
   void dispose() {
     titleController.dispose();
     contentController.dispose();
-
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          isEditing ? 'Editar nota' : 'Nova nota',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
+    final colors = Theme.of(context).colorScheme;
+    final note = saved;
 
-        actions: [
-          IconButton(
-            onPressed: saveNote,
-            icon: const Icon(Icons.check_rounded),
-          ),
-
-          const SizedBox(width: 8),
-        ],
-      ),
-
-      body: Padding(
-        padding: const EdgeInsets.all(22),
-
-        child: Column(
-          children: [
-            TextField(
-              controller: titleController,
-
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF292333),
+    // Voltar (botão ou gesto) também salva: não existe "perdi o que escrevi".
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) saveAndClose();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          actions: [
+            if (note != null)
+              IconButton(
+                tooltip: 'Apagar',
+                onPressed: delete,
+                icon: const Icon(Icons.delete_outline_rounded),
               ),
-
-              decoration: const InputDecoration(
-                hintText: 'Título',
-                border: InputBorder.none,
-                filled: false,
-                contentPadding: EdgeInsets.symmetric(horizontal: 4),
-              ),
+            IconButton(
+              tooltip: 'Salvar',
+              onPressed: saveAndClose,
+              icon: const Icon(Icons.check_rounded),
             ),
-
-            const Divider(color: Color(0xFFE4DFEA)),
-
-            Expanded(
-              child: TextField(
-                controller: contentController,
-
-                maxLines: null,
-
-                expands: true,
-
-                textAlignVertical: TextAlignVertical.top,
-
-                style: const TextStyle(
-                  fontSize: 17,
-                  height: 1.5,
-                  color: Color(0xFF40394A),
+            const SizedBox(width: 8),
+          ],
+        ),
+        body: ListenableBuilder(
+          listenable: controller,
+          builder: (context, _) => ListView(
+            padding: const EdgeInsets.fromLTRB(22, 0, 22, 40),
+            children: [
+              SizedBox(
+                height: 38,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    _CategoryOption(
+                      label: 'Sem categoria',
+                      selected: categoryId == null,
+                      onTap: () => setState(() => categoryId = null),
+                    ),
+                    for (final category in controller.categories)
+                      _CategoryOption(
+                        label: category.name,
+                        color: CategoryPalette.of(category.color),
+                        selected: categoryId == category.id,
+                        onTap: () => setState(() => categoryId = category.id),
+                      ),
+                    IconButton(
+                      tooltip: 'Nova categoria',
+                      onPressed: createCategory,
+                      icon: const Icon(Icons.add_rounded),
+                    ),
+                  ],
                 ),
-
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: titleController,
+                textCapitalization: TextCapitalization.sentences,
+                style: GoogleFonts.fraunces(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w600,
+                  color: colors.onSurface,
+                ),
+                maxLines: null,
                 decoration: const InputDecoration(
-                  hintText: 'Comece a escrever...',
+                  hintText: 'Título',
                   border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
                   filled: false,
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: 4,
-                    vertical: 15,
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              if (note != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'criada em ${formatDateTime(note.createdAt)} · '
+                  'editada em ${formatDateTime(note.updatedAt)}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 18),
+              RuledPaper(
+                lineHeight: _fontSize * _lineHeight,
+                child: TextField(
+                  controller: contentController,
+                  maxLines: null,
+                  minLines: 18,
+                  keyboardType: TextInputType.multiline,
+                  textCapitalization: TextCapitalization.sentences,
+                  style: TextStyle(
+                    fontSize: _fontSize,
+                    height: _lineHeight,
+                    color: colors.onSurface,
+                  ),
+                  strutStyle: const StrutStyle(
+                    fontSize: _fontSize,
+                    height: _lineHeight,
+                    forceStrutHeight: true,
+                  ),
+                  decoration: const InputDecoration(
+                    hintText: 'Comece a escrever…',
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    filled: false,
+                    isCollapsed: true,
+                    contentPadding: EdgeInsets.only(left: 14),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CategoryOption extends StatelessWidget {
+  const _CategoryOption({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.color,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: selected,
+        showCheckmark: false,
+        onSelected: (_) => onTap(),
+        selectedColor: color ?? colors.outline,
+        labelStyle: TextStyle(
+          color: selected && color != null
+              ? GrafiteColors.ink
+              : colors.onSurface,
+          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
         ),
       ),
     );
