@@ -10,6 +10,9 @@ Validação realizada em 02/11/2026, com Flutter 3.47.6 e Dart 3.13.5 no Windows
 | Regras de segurança no Firestore Emulator | 4 grupos de testes aprovados |
 | Aplicativo completo no Chrome com Firebase Emulator | Aprovado |
 | Aplicativo completo no Chrome com Firebase real | Aprovado |
+| `flutter analyze` | Sem problemas encontrados |
+| `flutter build web` com configuração do Firebase real | Gerado com sucesso |
+| `flutter build apk --debug` com configuração Android do Firebase real | APK gerado com sucesso |
 
 O teste da nuvem usou o projeto **bloco-de-notas-544ec**, banco `(default)`, região `southamerica-east1`, plano Spark. As regras deste repositório foram publicadas nesse projeto pelo Firebase CLI.
 
