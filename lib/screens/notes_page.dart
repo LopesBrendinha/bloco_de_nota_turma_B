@@ -28,11 +28,31 @@ class _NotesPageState extends State<NotesPage> {
   // true enquanto a sincronização com a nuvem está em andamento.
   bool syncing = false;
 
+  // Pesquisa e filtro. A busca roda no SQLite, que após a sincronização
+  // tem uma cópia de todas as notas do usuário (inclusive as da nuvem).
+  final TextEditingController searchController = TextEditingController();
+
+  String query = '';
+
+  // null significa "Todas as categorias".
+  String? selectedCategory;
+
+  List<String> categories = [];
+
+  bool get isFiltering => query.trim().isNotEmpty || selectedCategory != null;
+
   @override
   void initState() {
     super.initState();
 
     start();
+  }
+
+  @override
+  void dispose() {
+    searchController.dispose();
+
+    super.dispose();
   }
 
   Future<void> start() async {
@@ -74,19 +94,37 @@ class _NotesPageState extends State<NotesPage> {
     // não podemos buscar as notas.
     if (user == null) return;
 
-    // Enviamos o UID para o banco local.
+    // As categorias alimentam os chips de filtro.
+    await database.ensureDefaultCategories(user.uid);
+
+    final categoryList = await database.getCategories(user.uid);
+
+    // Enviamos o UID, o texto da pesquisa e a categoria escolhida.
     //
-    // O banco irá buscar somente as notas
-    // pertencentes a esse usuário.
-    final result = await database.getNotes(user.uid);
+    // O banco irá buscar somente as notas desse usuário que combinam
+    // com o título ou o conteúdo digitado e com a categoria.
+    final result = await database.getNotes(
+      user.uid,
+      query: query,
+      category: selectedCategory,
+    );
 
     if (mounted) {
       // Atualizamos a lista utilizada
       // pela interface.
       setState(() {
+        categories = categoryList;
         notes = result;
       });
     }
+  }
+
+  void clearSearch() {
+    searchController.clear();
+
+    query = '';
+
+    loadNotes();
   }
 
   Future<void> deleteNote(Note note) async {
@@ -213,13 +251,83 @@ class _NotesPageState extends State<NotesPage> {
               style: const TextStyle(color: Color(0xFF77717F), fontSize: 13),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
+
+            // Campo de pesquisa por título ou conteúdo.
+            TextField(
+              controller: searchController,
+
+              onChanged: (value) {
+                query = value;
+
+                loadNotes();
+              },
+
+              decoration: InputDecoration(
+                hintText: 'Pesquisar por título ou conteúdo',
+                prefixIcon: const Icon(Icons.search_rounded),
+                suffixIcon: query.isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: 'Limpar pesquisa',
+                        onPressed: clearSearch,
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // Filtro por categoria.
+            SizedBox(
+              height: 40,
+
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+
+                    child: ChoiceChip(
+                      label: const Text('Todas'),
+                      selected: selectedCategory == null,
+                      onSelected: (_) {
+                        selectedCategory = null;
+
+                        loadNotes();
+                      },
+                    ),
+                  ),
+
+                  for (final category in categories)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+
+                      child: ChoiceChip(
+                        label: Text(category),
+                        selected: selectedCategory == category,
+                        onSelected: (_) {
+                          selectedCategory = category;
+
+                          loadNotes();
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 12),
 
             if (notes.isEmpty)
               Expanded(
+                // O SingleChildScrollView evita faixa de erro de layout
+                // quando o teclado da pesquisa reduz o espaço da tela.
                 child: Center(
+                  child: SingleChildScrollView(
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
 
                     children: [
                       Container(
@@ -240,9 +348,9 @@ class _NotesPageState extends State<NotesPage> {
 
                       const SizedBox(height: 25),
 
-                      const Text(
-                        'Nenhuma nota ainda',
-                        style: TextStyle(
+                      Text(
+                        isFiltering ? 'Nenhum resultado' : 'Nenhuma nota ainda',
+                        style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                         ),
@@ -250,11 +358,14 @@ class _NotesPageState extends State<NotesPage> {
 
                       const SizedBox(height: 8),
 
-                      const Text(
-                        'Crie sua primeira nota.',
-                        style: TextStyle(color: Color(0xFF77717F)),
+                      Text(
+                        isFiltering
+                            ? 'Tente outro termo ou outra categoria.'
+                            : 'Crie sua primeira nota.',
+                        style: const TextStyle(color: Color(0xFF77717F)),
                       ),
                     ],
+                  ),
                   ),
                 ),
               )
