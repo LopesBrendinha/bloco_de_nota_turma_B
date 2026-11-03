@@ -31,15 +31,24 @@ class Note {
 
   bool get isDeleted => deletedAt != null;
 
-  /// Data de última alteração no formato dd/MM/aaaa HH:mm.
-  String get date {
-    final d = DateTime.fromMillisecondsSinceEpoch(updatedAt);
+  /// Formata milissegundos como dd/MM/aaaa HH:mm.
+  static String _format(int millis) {
+    final d = DateTime.fromMillisecondsSinceEpoch(millis);
     return '${d.day.toString().padLeft(2, '0')}/'
         '${d.month.toString().padLeft(2, '0')}/'
         '${d.year} '
         '${d.hour.toString().padLeft(2, '0')}:'
         '${d.minute.toString().padLeft(2, '0')}';
   }
+
+  /// Data da última alteração.
+  String get date => _format(updatedAt);
+
+  /// Data de criação.
+  String get createdDate => _format(createdAt);
+
+  /// Data em que a nota foi para a lixeira (vazio se não está nela).
+  String get deletedDate => deletedAt == null ? '' : _format(deletedAt!);
 
   Note copyWith({
     String? title,
