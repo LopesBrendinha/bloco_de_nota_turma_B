@@ -1,5 +1,5 @@
 name: blocodenotasturmab
-description: "A new Flutter project."
+description: "Grafite: bloco de notas offline-first com SQLite e Cloud Firestore."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -38,6 +38,10 @@ dependencies:
   firebase_auth: ^6.7.0
   sqflite: ^2.4.4+1
   path: ^1.9.1
+  cloud_firestore: 6.10.2
+  google_fonts: 8.2.1
+  uuid: 4.6.0
+  connectivity_plus: 7.3.2
 
 dev_dependencies:
   flutter_test:

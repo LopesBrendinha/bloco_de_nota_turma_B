@@ -1,8 +1,7 @@
-import 'dart:math';
-
-import 'package:blocodenotasturmab/screens/notes_page.dart';
 import 'package:blocodenotasturmab/screens/register_page.dart';
 import 'package:blocodenotasturmab/services/auth_service.dart';
+import 'package:blocodenotasturmab/theme/app_theme.dart';
+import 'package:blocodenotasturmab/widgets/grafite_logo.dart';
 import 'package:flutter/material.dart';
 
 class LoginPage extends StatefulWidget {
@@ -15,180 +14,134 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
-
   final AuthService authService = AuthService();
 
   bool loading = false;
   bool obscurePassword = true;
 
-  void showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      ),
-    );
-  }
-
+  /// Depois do login o AuthGate troca a tela automaticamente.
   Future<void> login() async {
     if (emailController.text.isEmpty || passwordController.text.isEmpty) {
-      showMessage("Preencha todos os campos");
+      showMessage('Preencha todos os campos');
       return;
     }
-    setState(() {
-      loading = true;
-    });
+
+    setState(() => loading = true);
     try {
-      final user = await authService.login(
+      await authService.login(
         emailController.text.trim(),
         passwordController.text.trim(),
       );
-
-      if (user != null && mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => NotesPage()),
-        );
-      }
     } catch (e) {
-      showMessage("Não foi posível realizar o login.");
+      showMessage(AuthService.messageFor(e));
     }
-
-    if (mounted) {
-      setState(() {
-        loading = false;
-      });
-    }
+    if (mounted) setState(() => loading = false);
   }
 
   @override
   void dispose() {
     emailController.dispose();
     passwordController.dispose();
-
     super.dispose();
+  }
+
+  void showMessage(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Scaffold(
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: EdgeInsets.all(28),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 82,
-                    height: 82,
-                    decoration: BoxDecoration(
-                      color: Color(0xffe8ddf8),
-                      borderRadius: BorderRadius.circular(26),
+            padding: const EdgeInsets.all(28),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const GrafiteLogo(size: 52),
+                  const SizedBox(height: 6),
+                  Text(
+                    'suas ideias, a lápis — e salvas na nuvem.',
+                    style: AppTheme.handwritten(context, size: 22),
+                  ),
+                  const SizedBox(height: 44),
+                  Text('Entrar', style: AppTheme.display(context, size: 30)),
+                  const SizedBox(height: 22),
+                  TextField(
+                    controller: emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    autofillHints: const [AutofillHints.email],
+                    decoration: const InputDecoration(
+                      labelText: 'E-mail',
+                      hintText: 'seu@email.com',
+                      prefixIcon: Icon(Icons.alternate_email_rounded),
                     ),
-                    child: Icon(
-                      Icons.edit_note_rounded,
-                      color: Color(0xff6c4ab6),
-                      size: 45,
-                    ),
                   ),
-                ),
-                SizedBox(height: 35),
-                Text(
-                  "Seja Bem-vindo",
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xff292333),
-                  ),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  "Entre para acessar suas notas",
-                  style: TextStyle(fontSize: 16, color: Color(0xff77717f)),
-                ),
-                SizedBox(height: 35),
-                Text(
-                  "E-mail",
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xff40394a),
-                  ),
-                ),
-                SizedBox(height: 8),
-                TextField(
-                  controller: emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: InputDecoration(
-                    hintText: "seu@email.com",
-                    prefixIcon: Icon(Icons.email_outlined),
-                  ),
-                ),
-                SizedBox(height: 20),
-
-                Text(
-                  "Senha",
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xff40394a),
-                  ),
-                ),
-                SizedBox(height: 8),
-                TextField(
-                  controller: passwordController,
-                  obscureText: obscurePassword,
-                  decoration: InputDecoration(
-                    hintText: "Digite sua senha",
-                    prefixIcon: Icon(Icons.lock_outline),
-                    suffixIcon: IconButton(
-                      onPressed: () {
-                        setState(() {
-                          obscurePassword = !obscurePassword;
-                        });
-                      },
-                      icon: Icon(
-                        obscurePassword
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: passwordController,
+                    obscureText: obscurePassword,
+                    autofillHints: const [AutofillHints.password],
+                    onSubmitted: (_) => login(),
+                    decoration: InputDecoration(
+                      labelText: 'Senha',
+                      prefixIcon: const Icon(Icons.lock_outline_rounded),
+                      suffixIcon: IconButton(
+                        onPressed: () =>
+                            setState(() => obscurePassword = !obscurePassword),
+                        icon: Icon(
+                          obscurePassword
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                SizedBox(height: 30),
-                ElevatedButton(
-                  onPressed: loading ? null : login,
-                  child: loading
-                      ? SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : Text(
-                          "Entrar",
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                ),
-                SizedBox(height: 20),
-                Center(
-                  child: TextButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => RegisterPage()),
-                      );
-                    },
-                    child: Text("Ainda não possui uma conta? Cadastre-se"),
+                  const SizedBox(height: 28),
+                  ElevatedButton(
+                    onPressed: loading ? null : login,
+                    child: loading
+                        ? SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              color: colors.surface,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Text('Entrar'),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  Center(
+                    child: TextButton(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const RegisterPage()),
+                      ),
+                      child: const Text.rich(
+                        TextSpan(
+                          text: 'Ainda não tem conta? ',
+                          children: [
+                            TextSpan(
+                              text: 'Cadastre-se',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
