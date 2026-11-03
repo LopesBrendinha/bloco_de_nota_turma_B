@@ -128,6 +128,30 @@ class _NotesPageState extends State<NotesPage> {
     }
   }
 
+  Future<void> toggleCompleted(Note note, bool completed) async {
+    final updated = note.copyWith(completed: completed);
+
+    setState(() {
+      final index = notes.indexWhere((item) => item.id == note.id);
+
+      if (index != -1) {
+        notes[index] = updated;
+      }
+    });
+
+    final sent = await repository.saveNote(updated);
+
+    await loadNotes();
+
+    if (mounted && !sent) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Sem conexão: nota será sincronizada quando houver conexão.'),
+        ),
+      );
+    }
+  }
+
   Future<void> logout() async {
     await authService.logout();
 
@@ -327,6 +351,8 @@ class _NotesPageState extends State<NotesPage> {
                         note: note,
                         onTap: () => openEditNote(note),
                         onDelete: () => deleteNote(note),
+                        onCompletedChanged: (completed) =>
+                            toggleCompleted(note, completed),
                       );
                     },
                   ),

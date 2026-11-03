@@ -5,12 +5,14 @@ class NoteCard extends StatelessWidget {
   final Note note;
   final VoidCallback onTap;
   final VoidCallback onDelete;
+  final ValueChanged<bool> onCompletedChanged;
 
   const NoteCard({
     super.key,
     required this.note,
     required this.onTap,
     required this.onDelete,
+    required this.onCompletedChanged,
   });
 
   @override
@@ -35,14 +37,11 @@ class NoteCard extends StatelessWidget {
           padding: EdgeInsets.all(20),
           child: Row(
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: Color(0xffede5fa),
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Icon(Icons.note_rounded, color: Color(0xff6c4ab6)),
+              Checkbox(
+                value: note.completed,
+                activeColor: Color(0xff6c4ab6),
+                semanticLabel: 'Concluir nota',
+                onChanged: (value) => onCompletedChanged(value ?? false),
               ),
               SizedBox(width: 15),
               Expanded(
@@ -57,6 +56,9 @@ class NoteCard extends StatelessWidget {
                         fontSize: 17,
                         fontWeight: FontWeight.bold,
                         color: Color(0xff292333),
+                        decoration: note.completed
+                            ? TextDecoration.lineThrough
+                            : null,
                       ),
                     ),
                     SizedBox(height: 5),

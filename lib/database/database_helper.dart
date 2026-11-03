@@ -23,11 +23,9 @@ class DatabaseHelper {
 
     final path = join(dbPath, fileName);
 
-    // Versão 2: adiciona as colunas de sincronização com o Firestore.
-    // Versão 3: adiciona a coluna de categoria.
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -45,6 +43,7 @@ class DatabaseHelper {
         date TEXT NOT NULL,
         updated_at INTEGER NOT NULL DEFAULT 0,
         category TEXT NOT NULL DEFAULT '',
+        completed INTEGER NOT NULL DEFAULT 0,
         synced INTEGER NOT NULL DEFAULT 0,
         deleted INTEGER NOT NULL DEFAULT 0
       )
@@ -69,6 +68,12 @@ class DatabaseHelper {
 
     if (oldVersion < 3) {
       await db.execute("ALTER TABLE notes ADD COLUMN category TEXT NOT NULL DEFAULT ''");
+    }
+
+    if (oldVersion < 4) {
+      await db.execute(
+        'ALTER TABLE notes ADD COLUMN completed INTEGER NOT NULL DEFAULT 0',
+      );
     }
   }
 

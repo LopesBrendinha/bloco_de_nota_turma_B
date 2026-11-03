@@ -93,6 +93,7 @@ class _NoteFormPageState extends State<NoteFormPage> {
       category: selectedCategory,
       content: content,
       date: date,
+      completed: widget.note?.completed ?? false,
     );
 
     final sent = await repository.saveNote(note);

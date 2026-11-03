@@ -14,6 +14,8 @@ class Note {
   final String content;
   final String date;
 
+  final bool completed;
+
   // Momento da última alteração, em milissegundos.
   final int updatedAt;
 
@@ -33,6 +35,7 @@ class Note {
     required this.category,
     required this.content,
     required this.date,
+    this.completed = false,
     int? updatedAt,
     this.synced = false,
     this.deleted = false,
@@ -42,6 +45,7 @@ class Note {
     int? id,
     String? remoteId,
     String? category,
+    bool? completed,
     bool? synced,
     bool? deleted,
   }) {
@@ -53,6 +57,7 @@ class Note {
       category: category ?? this.category,
       content: content,
       date: date,
+      completed: completed ?? this.completed,
       updatedAt: updatedAt,
       synced: synced ?? this.synced,
       deleted: deleted ?? this.deleted,
@@ -70,6 +75,7 @@ class Note {
       'category' : category,
       'content' : content,
       'date' : date,
+      'completed': completed ? 1 : 0,
       'updated_at': updatedAt,
       'synced': synced ? 1 : 0,
       'deleted': deleted ? 1 : 0,
@@ -85,6 +91,7 @@ class Note {
       category: map['category'] ?? '',
       content: map['content'],
       date: map['date'],
+      completed: map['completed'] == 1,
       updatedAt: map['updated_at'] ?? 0,
       synced: map['synced'] == 1,
       deleted: map['deleted'] == 1,
@@ -100,6 +107,7 @@ class Note {
       'category': category,
       'content': content,
       'date': date,
+      'completed': completed,
       'updatedAt': updatedAt,
     };
   }
@@ -112,6 +120,7 @@ class Note {
       category: data['category'] ?? '',
       content: data['content'] ?? '',
       date: data['date'] ?? '',
+      completed: data['completed'] ?? false,
       updatedAt: data['updatedAt'] ?? 0,
       synced: true,
     );
