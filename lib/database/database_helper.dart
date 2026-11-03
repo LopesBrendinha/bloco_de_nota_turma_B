@@ -13,9 +13,7 @@ class DatabaseHelper {
   final DatabaseFactory? _factory;
   Database? _database;
 
-  DatabaseHelper({String? path, DatabaseFactory? factory})
-      : _path = path,
-        _factory = factory;
+  DatabaseHelper({this._path, this._factory});
 
   Future<Database> get database async {
     return _database ??= await _initDB();
