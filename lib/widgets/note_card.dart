@@ -67,9 +67,24 @@ class NoteCard extends StatelessWidget {
                       style: TextStyle(color: Color(0xff77717f), height: 1.4),
                     ),
                     SizedBox(height: 8),
-                    Text(
-                      note.date,
-                      style: TextStyle(fontSize: 11, color: Color(0xff9a94a1)),
+                    Row(
+                      children: [
+                        Text(
+                          note.category,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xff6c4ab6),
+                          ),
+                        ),
+                        Text(
+                          '  •  ${note.date}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Color(0xff9a94a1),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
