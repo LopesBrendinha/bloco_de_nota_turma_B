@@ -20,6 +20,11 @@ class _NoteFormPageState extends State<NoteFormPage> {
 
   final database = DatabaseHelper.instance;
 
+  // Categorias disponíveis para o usuário e a que está escolhida na nota.
+  List<String> categories = [];
+
+  String selectedCategory = 'Geral';
+
   bool get isEditing => widget.note != null;
 
   @override
@@ -30,7 +35,76 @@ class _NoteFormPageState extends State<NoteFormPage> {
       titleController.text = widget.note!.title;
 
       contentController.text = widget.note!.content;
+
+      selectedCategory = widget.note!.category;
     }
+
+    loadCategories();
+  }
+
+  Future<void> loadCategories() async {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) return;
+
+    await database.ensureDefaultCategories(user.uid);
+
+    final result = await database.getCategories(user.uid);
+
+    // Se a categoria da nota não estiver na lista (por exemplo, veio
+    // da nuvem), ela é incluída para continuar aparecendo escolhida.
+    if (!result.contains(selectedCategory)) {
+      result.add(selectedCategory);
+    }
+
+    if (mounted) {
+      setState(() {
+        categories = result;
+      });
+    }
+  }
+
+  Future<void> addCategory() async {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) return;
+
+    final controller = TextEditingController();
+
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Nova categoria'),
+
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(hintText: 'Nome da categoria'),
+        ),
+
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+
+          TextButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Criar'),
+          ),
+        ],
+      ),
+    );
+
+    if (name == null || name.isEmpty) return;
+
+    await database.insertCategory(user.uid, name);
+
+    // A nova categoria já fica escolhida para esta nota.
+    selectedCategory = name;
+
+    await loadCategories();
   }
 
   Future<void> saveNote() async {
@@ -61,6 +135,7 @@ class _NoteFormPageState extends State<NoteFormPage> {
         ? widget.note!.copyWith(
             title: title,
             content: content,
+            category: selectedCategory,
             updatedAt: nowMs,
             synced: false,
           )
@@ -69,6 +144,7 @@ class _NoteFormPageState extends State<NoteFormPage> {
             uid: user.uid,
             title: title,
             content: content,
+            category: selectedCategory,
             createdAt: nowMs,
             updatedAt: nowMs,
           );
@@ -133,6 +209,37 @@ class _NoteFormPageState extends State<NoteFormPage> {
             ),
 
             const Divider(color: Color(0xFFE4DFEA)),
+
+            // Escolha da categoria: um chip por categoria e o chip
+            // "Nova" para criar uma categoria própria.
+            SizedBox(
+              height: 48,
+
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+
+                children: [
+                  for (final category in categories)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+
+                      child: ChoiceChip(
+                        label: Text(category),
+                        selected: category == selectedCategory,
+                        onSelected: (_) {
+                          setState(() => selectedCategory = category);
+                        },
+                      ),
+                    ),
+
+                  ActionChip(
+                    avatar: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('Nova'),
+                    onPressed: addCategory,
+                  ),
+                ],
+              ),
+            ),
 
             Expanded(
               child: TextField(

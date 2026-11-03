@@ -55,14 +55,23 @@ class DatabaseHelper {
     ''');
   }
 
-  
+  /// Da versão 1 para a 2 o ID passou de inteiro para UUID (texto),
+  /// o que muda a chave primária. Como o SQLite não altera isso com
+  /// ALTER TABLE, as tabelas são recriadas. Notas antigas de teste,
+  /// só locais, são descartadas.
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
     await db.execute('DROP TABLE IF EXISTS notes');
     await db.execute('DROP TABLE IF EXISTS categories');
     await _createDB(db, newVersion);
   }
 
- 
+  // ---------------------------------------------------------------
+  // Notas
+  // ---------------------------------------------------------------
+
+  /// Insere a nota ou, se o ID já existir, substitui (upsert).
+  /// Serve tanto para criar quanto para editar e para gravar
+  /// notas baixadas do Firestore.
   Future<void> upsertNote(Note note) async {
     final db = await instance.database;
 
@@ -73,7 +82,8 @@ class DatabaseHelper {
     );
   }
 
-  
+  /// Notas ativas (fora da lixeira) do usuário, da mais recente para
+  /// a mais antiga. Aceita busca por título/conteúdo e filtro de categoria.
   Future<List<Note>> getNotes(
     String uid, {
     String query = '',
@@ -133,7 +143,7 @@ class DatabaseHelper {
     return result.map(Note.fromMap).toList();
   }
 
-
+  /// Notas com alterações ainda não enviadas ao Firestore.
   Future<List<Note>> getUnsyncedNotes(String uid) async {
     final db = await instance.database;
 
@@ -152,14 +162,16 @@ class DatabaseHelper {
     await db.update('notes', {'synced': 1}, where: 'id = ?', whereArgs: [id]);
   }
 
-  
+  /// Exclusão definitiva (só para notas que já estão na lixeira).
   Future<void> deleteNotePermanently(String id) async {
     final db = await instance.database;
 
     await db.delete('notes', where: 'id = ?', whereArgs: [id]);
   }
 
- 
+  // ---------------------------------------------------------------
+  // Categorias
+  // ---------------------------------------------------------------
 
   Future<List<String>> getCategories(String uid) async {
     final db = await instance.database;
@@ -183,5 +195,22 @@ class DatabaseHelper {
       {'uid': uid, 'name': name},
       conflictAlgorithm: ConflictAlgorithm.ignore,
     );
+  }
+
+  /// Categorias que todo usuário já começa tendo. As que ele criar
+  /// depois ficam na mesma tabela.
+  static const List<String> defaultCategories = [
+    'Geral',
+    'Estudos',
+    'Trabalho',
+    'Pessoal',
+  ];
+
+  /// Garante as categorias padrão para o usuário. Pode ser chamado
+  /// várias vezes: o que já existe é ignorado.
+  Future<void> ensureDefaultCategories(String uid) async {
+    for (final name in defaultCategories) {
+      await insertCategory(uid, name);
+    }
   }
 }
