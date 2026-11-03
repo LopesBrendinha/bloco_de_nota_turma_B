@@ -1,0 +1,34 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Cada usuário só acessa a própria subcoleção: users/{uid}/notes/{noteId}
+    match /users/{userId}/notes/{noteId} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      // Impede gravar nota "em nome" de outro usuário e valida o formato.
+      function isValidNote() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['uid', 'title', 'content', 'category', 'createdAt', 'updatedAt', 'trashed'])
+          && d.uid == userId
+          && d.title is string && d.title.size() <= 200
+          && d.content is string && d.content.size() <= 100000
+          && d.category is string && d.category.size() > 0 && d.category.size() <= 50
+          && d.createdAt is timestamp
+          && d.updatedAt is timestamp
+          && d.trashed is bool;
+      }
+
+      allow read, delete: if isOwner();
+      allow create, update: if isOwner() && isValidNote();
+    }
+
+    // Qualquer outro caminho é bloqueado.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
