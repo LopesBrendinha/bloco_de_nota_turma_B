@@ -97,31 +97,56 @@ flutter test
 
 > O `sqflite` funciona em Android, iOS e macOS. Web e Windows não são suportados pelo banco local.
 
+### Gerar o APK sem Android Studio (Docker)
+
+As capturas deste README foram feitas assim: o APK foi compilado num container e instalado direto no celular. Isso dispensa instalar o Android SDK. Com o Docker Desktop aberto e o Firebase já configurado (próxima seção), rode no **PowerShell**, na pasta do projeto:
+
+```powershell
+docker run --rm -v "${PWD}:/src:ro" -v "${PWD}\build-docker:/out" ghcr.io/cirruslabs/flutter:stable bash -c 'git clone -q --depth 1 -b 3.47.1 https://github.com/flutter/flutter.git /opt/flutter && export PATH=/opt/flutter/bin:$PATH && cp -r /src /app && cd /app && rm -rf build .dart_tool android/.gradle android/local.properties && flutter build apk --release && cp build/app/outputs/flutter-apk/app-release.apk /out/grafite.apk'
+```
+
+A imagem já traz o Android SDK, e o comando baixa dentro dela o Flutter 3.47.1 (o projeto exige Dart 3.12.2, mais novo que o da imagem `stable`). Na primeira vez, a compilação leva alguns minutos. O arquivo sai em `build-docker/grafite.apk` (pasta ignorada pelo Git). Para instalar, copie-o para o celular, abra e permita a instalação de apps de fontes desconhecidas.
+
 ## Configurar o Firebase
 
 1. Acesse o [console do Firebase](https://console.firebase.google.com/) e crie um projeto.
 2. Em **Authentication → Método de login**, ative **E-mail/senha**.
 3. Em **Firestore Database**, crie o banco de dados (modo de produção, região de sua preferência).
-4. Instale as ferramentas (uma vez por computador):
+4. Instale as ferramentas (uma vez por computador). No Windows, use o **Prompt de Comando (cmd)**, não o PowerShell (veja os problemas comuns abaixo):
    ```bash
    npm install -g firebase-tools
    ```
    ```bash
    dart pub global activate flutterfire_cli
    ```
-5. Na pasta do projeto, faça login e gere a configuração:
+5. Na pasta do projeto, faça login e confira se o projeto aparece:
    ```bash
    firebase login
    ```
    ```bash
-   flutterfire configure
+   firebase projects:list
    ```
-   Escolha o projeto criado e as plataformas (pelo menos Android). O comando cria `lib/firebase_options.dart` e `android/app/google-services.json`.
-6. Publique as regras de segurança. Pelo terminal:
+6. Gere a configuração do app, trocando `SEU_PROJECT_ID` pelo ID mostrado no passo anterior:
    ```bash
-   firebase deploy --only firestore:rules
+   dart pub global run flutterfire_cli:flutterfire configure --project=SEU_PROJECT_ID --platforms=android
+   ```
+   Se ele perguntar se quer substituir um `firebase_options.dart` ou `google-services.json` existente, responda **yes**. O comando cria `lib/firebase_options.dart` e `android/app/google-services.json`, e acrescenta os IDs do seu projeto no `firebase.json`. Essa alteração no `firebase.json` não precisa ir para o Git: `git checkout firebase.json` a desfaz sem afetar o app.
+7. Publique as regras de segurança (o banco do Firestore precisa ter sido criado no passo 3):
+   ```bash
+   firebase deploy --only firestore:rules --project SEU_PROJECT_ID
    ```
    Ou copie o conteúdo de [`firestore.rules`](firestore.rules) em **Firestore → Regras** no console e clique em **Publicar**.
+
+### Problemas comuns na configuração
+
+| Sintoma | Causa e solução |
+|---|---|
+| `npm.ps1 não pode ser carregado porque a execução de scripts foi desabilitada` | O PowerShell bloqueia scripts. Digite `cmd` no terminal para trocar para o Prompt de Comando, ou use `npm.cmd` e `firebase.cmd` no lugar de `npm` e `firebase`. |
+| `'flutterfire' não é reconhecido como um comando` | A pasta de executáveis do Dart não está no PATH. Use a forma completa `dart pub global run flutterfire_cli:flutterfire configure`, como no passo 6. |
+| Pergunta *"reuse the values in your existing firebase.json?"* | Responda **no**. O `firebase.json` do repositório só aponta para as regras e não tem a configuração de nenhum projeto. Respondendo yes, o comando termina sem gerar nada. Passar `--project` evita a pergunta. |
+| `Found 0 Firebase projects` | O terminal está logado com outra conta Google. Confira com `firebase login:list` e troque com `firebase logout` e `firebase login`. |
+| `Failed to add Firebase to Google Cloud Platform project` (erro 403) ao criar o projeto pelo terminal | Comum em contas institucionais ou quando os termos do Firebase ainda não foram aceitos. Crie o projeto pelo console (passo 1) e depois rode o passo 6. |
+| `Assertion failed: ... UV_HANDLE_CLOSING` | Aviso conhecido do Firebase CLI no Windows. Pode ser ignorado. |
 
 ### Por que os arquivos de configuração não estão no repositório
 
@@ -334,6 +359,10 @@ Em modo avião, a nota criada fica com o ícone de envio pendente, o indicador d
 **Notas gravadas no Cloud Firestore** em `users/{uid}/notes`, com os mesmos ids (UUID) usados no SQLite. Ao lado aparece a subcoleção `categories`:
 
 ![Notas no Firestore](docs/screenshots/firestore-notas.png)
+
+**Conteúdo de uma nota no Firestore**: os campos gravados pelo app (`uid` do dono, `title`, `content`, `categoryId` apontando para a categoria Estudos, e `createdAt`/`updatedAt` em milissegundos). É a mesma nota "Projeto X" que aparece editada nas capturas do app:
+
+![Campos de uma nota no Firestore](docs/screenshots/firestore-nota-campos.png)
 
 **Authentication**: o usuário cadastrado pelo app e o provedor E-mail/senha ativado:
 
