@@ -1,10 +1,11 @@
 import 'dart:async';
 
 import 'package:blocodenotasturmab/database/database_helper.dart';
+import 'package:blocodenotasturmab/models/note.dart';
 import 'package:blocodenotasturmab/services/firestore_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// Resultado de uma sincronização, para a tela saber o que mostrar.
+/// Resultado de uma operação com a nuvem, para a tela saber o que mostrar.
 class SyncReport {
   final bool success;
   final String message;
@@ -22,6 +23,8 @@ class SyncReport {
 ///    novas ou mais recentes da nuvem são baixadas.
 ///  - Em conflito (a mesma nota alterada em dois lugares), vale a de
 ///    updatedAt mais recente ("a última alteração vence").
+///  - Enviar para a lixeira e restaurar são alterações comuns (mudam
+///    o deletedAt). Só a exclusão definitiva remove o documento.
 class SyncService {
   SyncService({DatabaseHelper? local, FirestoreService? remote})
     : _local = local ?? DatabaseHelper.instance,
@@ -50,14 +53,23 @@ class SyncService {
         final remote = remoteById[local.id];
 
         // A versão da nuvem é mais nova: ela vence e será baixada no
-        // passo 3. Não sobrescrevemos com a versão local antiga.
+        // passo 4. Não sobrescrevemos com a versão local antiga.
         if (remote != null && remote.updatedAt > local.updatedAt) continue;
 
         await _remote.saveNote(local);
         await _local.markAsSynced(local.id);
       }
 
-      // 3) Baixar notas novas ou mais recentes da nuvem.
+      // 3) Notas que já estiveram na nuvem (synced) e não existem mais
+      // lá foram excluídas definitivamente em outro aparelho.
+      // Apagamos a cópia local para as duas bases ficarem iguais.
+      for (final local in localNotes) {
+        if (local.synced && !remoteById.containsKey(local.id)) {
+          await _local.deleteNotePermanently(local.id);
+        }
+      }
+
+      // 4) Baixar notas novas ou mais recentes da nuvem.
       for (final remote in remoteNotes) {
         final local = localById[remote.id];
 
@@ -70,31 +82,62 @@ class SyncService {
       }
 
       return const SyncReport.ok();
-    } on TimeoutException {
-      return const SyncReport.failed(
-        'Sem conexão com a nuvem. As notas continuam salvas no aparelho '
-        'e serão enviadas quando a conexão voltar.',
+    } catch (error) {
+      return _failure(error);
+    } finally {
+      _running = false;
+    }
+  }
+
+  /// Exclusão definitiva de uma nota da lixeira.
+  ///
+  /// Primeiro apaga na nuvem e só depois no aparelho. Se for ao
+  /// contrário, a nota apagada só localmente voltaria na próxima
+  /// sincronização. Por isso, sem conexão, a exclusão não é feita.
+  Future<SyncReport> deletePermanently(Note note) async {
+    try {
+      await _remote.deleteNote(note.uid, note.id);
+      await _local.deleteNotePermanently(note.id);
+
+      return const SyncReport.ok();
+    } catch (error) {
+      return _failure(
+        error,
+        offlineMessage:
+            'Não foi possível excluir definitivamente agora. '
+            'Conecte-se à internet e tente de novo.',
       );
-    } on FirebaseException catch (e) {
-      if (e.code == 'permission-denied') {
+    }
+  }
+
+  /// Converte um erro técnico em uma mensagem para o usuário.
+  SyncReport _failure(Object error, {String? offlineMessage}) {
+    final offline =
+        offlineMessage ??
+        'Sem conexão com a nuvem. As notas continuam salvas no aparelho '
+            'e serão enviadas quando a conexão voltar.';
+
+    if (error is TimeoutException) {
+      return SyncReport.failed(offline);
+    }
+
+    if (error is FirebaseException) {
+      if (error.code == 'permission-denied') {
         return const SyncReport.failed(
           'Sem permissão para acessar as notas na nuvem. '
           'Verifique as regras do Firestore e o login.',
         );
       }
-      if (e.code == 'unavailable') {
-        return const SyncReport.failed(
-          'Não foi possível acessar o Firebase agora. '
-          'As notas continuam salvas no aparelho.',
-        );
+
+      if (error.code == 'unavailable') {
+        return SyncReport.failed(offline);
       }
-      return SyncReport.failed('Erro na sincronização (${e.code}).');
-    } catch (_) {
-      return const SyncReport.failed(
-        'Erro inesperado ao sincronizar. Suas notas locais estão seguras.',
-      );
-    } finally {
-      _running = false;
+
+      return SyncReport.failed('Erro na sincronização (${error.code}).');
     }
+
+    return const SyncReport.failed(
+      'Erro inesperado ao sincronizar. Suas notas locais estão seguras.',
+    );
   }
 }
