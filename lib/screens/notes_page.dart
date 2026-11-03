@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../database/database_helper.dart';
 import '../models/note.dart';
 import '../services/auth_service.dart';
+import '../services/sync_service.dart';
 import '../widgets/note_card.dart';
 import 'login_page.dart';
 import 'note_form_page.dart';
@@ -20,13 +21,48 @@ class _NotesPageState extends State<NotesPage> {
 
   final AuthService authService = AuthService();
 
+  final SyncService syncService = SyncService();
+
   List<Note> notes = [];
+
+  // true enquanto a sincronização com a nuvem está em andamento.
+  bool syncing = false;
 
   @override
   void initState() {
     super.initState();
 
-    loadNotes();
+    start();
+  }
+
+  Future<void> start() async {
+    // Primeiro mostramos o que já existe no aparelho (rápido e
+    // funciona sem internet) e só depois sincronizamos com a nuvem.
+    await loadNotes();
+    await syncNotes();
+  }
+
+  Future<void> syncNotes() async {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null || syncing) return;
+
+    setState(() => syncing = true);
+
+    final report = await syncService.sync(user.uid);
+
+    if (!mounted) return;
+
+    setState(() => syncing = false);
+
+    // A nuvem pode ter trazido notas novas: recarregamos a lista.
+    await loadNotes();
+
+    if (!report.success && mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(report.message)));
+    }
   }
 
   Future<void> loadNotes() async {
@@ -53,10 +89,16 @@ class _NotesPageState extends State<NotesPage> {
     }
   }
 
-  Future<void> deleteNote(String id) async {
-    // Por enquanto a exclusão é definitiva.
-    // Na etapa da lixeira, isso passa a mover a nota para lá.
-    await database.deleteNotePermanently(id);
+  Future<void> deleteNote(Note note) async {
+    // A nota não é apagada: recebe a data de exclusão (deletedAt) e vai
+    // para a lixeira. Como é uma alteração como outra qualquer, ela
+    // também é sincronizada com a nuvem. A tela da lixeira, para
+    // restaurar ou excluir de vez, vem na etapa seguinte.
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    await database.upsertNote(
+      note.copyWith(deletedAt: now, updatedAt: now, synced: false),
+    );
 
     // Depois de excluir,
     // buscamos novamente as notas.
@@ -65,8 +107,10 @@ class _NotesPageState extends State<NotesPage> {
     if (mounted) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Nota excluída.')));
+      ).showSnackBar(const SnackBar(content: Text('Nota movida para a lixeira.')));
     }
+
+    syncNotes();
   }
 
   Future<void> logout() async {
@@ -89,8 +133,9 @@ class _NotesPageState extends State<NotesPage> {
     );
 
     // Quando o usuário voltar para essa página,
-    // buscamos novamente as notas.
+    // buscamos novamente as notas e enviamos a nova à nuvem.
     await loadNotes();
+    syncNotes();
   }
 
   Future<void> openEditNote(Note note) async {
@@ -102,8 +147,9 @@ class _NotesPageState extends State<NotesPage> {
     );
 
     // Quando retornar da edição,
-    // atualizamos a lista.
+    // atualizamos a lista e enviamos a alteração à nuvem.
     await loadNotes();
+    syncNotes();
   }
 
   @override
@@ -118,6 +164,18 @@ class _NotesPageState extends State<NotesPage> {
         ),
 
         actions: [
+          IconButton(
+            tooltip: 'Sincronizar',
+            onPressed: syncing ? null : () => syncNotes(),
+            icon: syncing
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.sync_rounded),
+          ),
+
           IconButton(
             tooltip: 'Sair',
             onPressed: logout,
@@ -213,7 +271,7 @@ class _NotesPageState extends State<NotesPage> {
 
                       onTap: () => openEditNote(note),
 
-                      onDelete: () => deleteNote(note.id),
+                      onDelete: () => deleteNote(note),
                     );
                   },
                 ),
