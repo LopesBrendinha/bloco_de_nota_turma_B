@@ -6,11 +6,16 @@ class NoteCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onDelete;
 
+  /// Quando a lista está ordenada por criação, o card mostra a data
+  /// de criação em vez da data da última alteração.
+  final bool showCreatedDate;
+
   const NoteCard({
     super.key,
     required this.note,
     required this.onTap,
     required this.onDelete,
+    this.showCreatedDate = false,
   });
 
   @override
@@ -78,7 +83,7 @@ class NoteCard extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          '  •  ${note.date}',
+                          '  •  ${showCreatedDate ? note.createdDate : note.date}',
                           style: TextStyle(
                             fontSize: 11,
                             color: Color(0xff9a94a1),

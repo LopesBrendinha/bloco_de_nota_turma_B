@@ -2,6 +2,10 @@ import 'package:blocodenotasturmab/models/note.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
+/// Critério de ordenação da lista de notas (sempre da mais recente
+/// para a mais antiga).
+enum NoteSort { updatedAt, createdAt }
+
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
 
@@ -83,11 +87,13 @@ class DatabaseHelper {
   }
 
   /// Notas ativas (fora da lixeira) do usuário, da mais recente para
-  /// a mais antiga. Aceita busca por título/conteúdo e filtro de categoria.
+  /// a mais antiga. Aceita busca por título/conteúdo, filtro de
+  /// categoria e a escolha de ordenar por atualização ou por criação.
   Future<List<Note>> getNotes(
     String uid, {
     String query = '',
     String? category,
+    NoteSort sort = NoteSort.updatedAt,
   }) async {
     final db = await instance.database;
 
@@ -109,7 +115,9 @@ class DatabaseHelper {
       'notes',
       where: where.toString(),
       whereArgs: args,
-      orderBy: 'updatedAt DESC',
+      orderBy: sort == NoteSort.createdAt
+          ? 'createdAt DESC'
+          : 'updatedAt DESC',
     );
 
     return result.map(Note.fromMap).toList();
