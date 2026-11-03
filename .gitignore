@@ -43,3 +43,15 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+.firebase/
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+.env
+.env.*
+!.env.example
+*firebase-adminsdk*.json
+*service-account*.json
+serviceAccount*.json
+/atividade.txt

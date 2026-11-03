@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../database/database_helper.dart';
 import '../models/note.dart';
 import '../services/auth_service.dart';
+import '../services/note_sync_service.dart';
 import '../widgets/note_card.dart';
 import 'login_page.dart';
 import 'note_form_page.dart';
@@ -16,11 +19,18 @@ class NotesPage extends StatefulWidget {
 }
 
 class _NotesPageState extends State<NotesPage> {
-  final DatabaseHelper database = DatabaseHelper.ínstance;
+  final DatabaseHelper database = DatabaseHelper.instance;
 
   final AuthService authService = AuthService();
+  final NoteSyncService syncService = NoteSyncService();
 
   List<Note> notes = [];
+  bool loading = true;
+  bool synchronizing = false;
+  bool syncAgain = false;
+  String? syncMessage;
+  final searchController = TextEditingController();
+  String searchQuery = '';
 
   @override
   void initState() {
@@ -29,92 +39,179 @@ class _NotesPageState extends State<NotesPage> {
     loadNotes();
   }
 
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
+
   Future<void> loadNotes() async {
-    // Recuperamos o usuário atualmente
-    // autenticado no Firebase.
+    if (!mounted) return;
+
     final user = FirebaseAuth.instance.currentUser;
-
-    // Se não houver usuário,
-    // não podemos buscar as notas.
-    if (user == null) return;
-
-    // Enviamos o UID para o banco local.
-    //
-    // O banco irá buscar somente as notas
-    // pertencentes a esse usuário.
-    final result = await database.getNotes(user.uid);
-
-    if (mounted) {
-      // Atualizamos a lista utilizada
-      // pela interface.
+    if (user == null) {
       setState(() {
-        notes = result;
+        loading = false;
+        notes = [];
       });
+      return;
+    }
+
+    setState(() {
+      loading = true;
+    });
+
+    bool loaded = false;
+
+    try {
+      final result = await database.getNotes(user.uid);
+
+      if (mounted) {
+        setState(() {
+          notes = result;
+        });
+      }
+      loaded = true;
+    } catch (e) {
+      showMessage('Não foi possível carregar as notas.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          loading = false;
+        });
+      }
+    }
+
+    if (loaded && mounted) {
+      await synchronizeNotes();
     }
   }
 
+  Future<void> synchronizeNotes() async {
+    if (!mounted) return;
+
+    if (synchronizing) {
+      syncAgain = true;
+      return;
+    }
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    setState(() {
+      synchronizing = true;
+      syncMessage = 'Sincronizando notas...';
+    });
+
+    String message;
+
+    try {
+      await syncService.synchronize(user.uid);
+      final pending = await database.getPendingNotes(user.uid);
+      message = pending.isEmpty
+          ? 'Notas sincronizadas.'
+          : 'Há alterações locais pendentes. Toque em sincronizar.';
+    } on TimeoutException {
+      message = 'Sem conexão. Suas notas locais estão preservadas. Tente sincronizar novamente.';
+    } on FirebaseException catch (e) {
+      message = e.code == 'permission-denied'
+          ? 'Sua conta não tem permissão para sincronizar as notas.'
+          : 'Não foi possível acessar a nuvem. Suas notas locais estão preservadas.';
+    } catch (e) {
+      message = 'Não foi possível sincronizar. Suas notas locais estão preservadas.';
+    }
+
+    try {
+      final result = await database.getNotes(user.uid);
+
+      if (mounted && FirebaseAuth.instance.currentUser?.uid == user.uid) {
+        setState(() {
+          notes = result;
+          syncMessage = message;
+        });
+      }
+    } catch (e) {
+      showMessage('Não foi possível atualizar a lista de notas.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          synchronizing = false;
+        });
+      }
+    }
+
+    if (syncAgain && mounted) {
+      syncAgain = false;
+      await synchronizeNotes();
+    }
+  }
+
+  void showMessage(String message) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   Future<void> deleteNote(int id) async {
-    // Enviamos o ID da nota para o banco.
-    //
-    // O banco executará:
-    //
-    // DELETE FROM notes
-    // WHERE id = ?
-    //
-    // O ? será substituído pelo ID.
-    await database.deleteNote(id);
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
 
-    // Depois de excluir,
-    // buscamos novamente as notas.
-    await loadNotes();
-
-    if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Nota excluída.')));
+    try {
+      await database.deleteNote(id, user.uid);
+      await loadNotes();
+      showMessage('Nota excluída.');
+    } catch (e) {
+      showMessage('Não foi possível excluir a nota.');
     }
   }
 
   Future<void> logout() async {
-    await authService.logout();
+    try {
+      await authService.logout();
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const LoginPage()),
-      (route) => false,
-    );
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+        (route) => false,
+      );
+    } catch (e) {
+      showMessage('Não foi possível sair da conta.');
+    }
   }
 
   Future<void> openNewNote() async {
-    // Abre a tela responsável pelo formulário.
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const NoteFormPage()),
+      MaterialPageRoute(builder: (_) => NoteFormPage(
+        categories: notes.map((note) => note.category).toSet().toList(),
+      )),
     );
 
-    // Quando o usuário voltar para essa página,
-    // buscamos novamente as notas.
     await loadNotes();
   }
 
   Future<void> openEditNote(Note note) async {
-    // Passamos a nota selecionada
-    // para a tela de edição.
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => NoteFormPage(note: note)),
+      MaterialPageRoute(builder: (_) => NoteFormPage(
+        note: note,
+        categories: notes.map((note) => note.category).toSet().toList(),
+      )),
     );
 
-    // Quando retornar da edição,
-    // atualizamos a lista.
     await loadNotes();
   }
 
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
+    final filteredNotes = notes.where(
+      (note) => note.matchesSearch(searchQuery),
+    ).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -124,6 +221,11 @@ class _NotesPageState extends State<NotesPage> {
         ),
 
         actions: [
+          IconButton(
+            tooltip: 'Sincronizar notas',
+            onPressed: synchronizing ? null : synchronizeNotes,
+            icon: const Icon(Icons.sync),
+          ),
           IconButton(
             tooltip: 'Sair',
             onPressed: logout,
@@ -161,9 +263,44 @@ class _NotesPageState extends State<NotesPage> {
               style: const TextStyle(color: Color(0xFF77717F), fontSize: 13),
             ),
 
+            if (syncMessage != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                syncMessage!,
+                style: const TextStyle(color: Color(0xFF77717F), fontSize: 13),
+              ),
+            ],
+
             const SizedBox(height: 20),
 
-            if (notes.isEmpty)
+            TextField(
+              controller: searchController,
+              onChanged: (value) {
+                setState(() {
+                  searchQuery = value;
+                });
+              },
+              decoration: InputDecoration(
+                hintText: 'Pesquisar por título ou conteúdo',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: searchQuery.isEmpty ? null : IconButton(
+                  tooltip: 'Limpar pesquisa',
+                  icon: const Icon(Icons.clear),
+                  onPressed: () {
+                    searchController.clear();
+                    setState(() {
+                      searchQuery = '';
+                    });
+                  },
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            if (loading)
+              const Expanded(child: Center(child: CircularProgressIndicator()))
+            else if (notes.isEmpty)
               Expanded(
                 child: Center(
                   child: Column(
@@ -206,13 +343,17 @@ class _NotesPageState extends State<NotesPage> {
                   ),
                 ),
               )
+            else if (filteredNotes.isEmpty)
+              const Expanded(
+                child: Center(child: Text('Nenhuma nota encontrada.')),
+              )
             else
               Expanded(
                 child: ListView.builder(
-                  itemCount: notes.length,
+                  itemCount: filteredNotes.length,
 
                   itemBuilder: (context, index) {
-                    final note = notes[index];
+                    final note = filteredNotes[index];
 
                     return NoteCard(
                       note: note,
