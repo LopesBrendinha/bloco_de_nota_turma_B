@@ -8,6 +8,7 @@ import '../services/sync_service.dart';
 import '../widgets/note_card.dart';
 import 'login_page.dart';
 import 'note_form_page.dart';
+import 'trash_page.dart';
 
 class NotesPage extends StatefulWidget {
   const NotesPage({super.key});
@@ -38,6 +39,9 @@ class _NotesPageState extends State<NotesPage> {
   String? selectedCategory;
 
   List<String> categories = [];
+
+  // Ordenação da lista: por última atualização (padrão) ou por criação.
+  NoteSort sort = NoteSort.updatedAt;
 
   bool get isFiltering => query.trim().isNotEmpty || selectedCategory != null;
 
@@ -107,6 +111,7 @@ class _NotesPageState extends State<NotesPage> {
       user.uid,
       query: query,
       category: selectedCategory,
+      sort: sort,
     );
 
     if (mounted) {
@@ -130,8 +135,8 @@ class _NotesPageState extends State<NotesPage> {
   Future<void> deleteNote(Note note) async {
     // A nota não é apagada: recebe a data de exclusão (deletedAt) e vai
     // para a lixeira. Como é uma alteração como outra qualquer, ela
-    // também é sincronizada com a nuvem. A tela da lixeira, para
-    // restaurar ou excluir de vez, vem na etapa seguinte.
+    // também é sincronizada com a nuvem. Na tela da lixeira é possível
+    // restaurar a nota ou excluí-la definitivamente.
     final now = DateTime.now().millisecondsSinceEpoch;
 
     await database.upsertNote(
@@ -161,6 +166,18 @@ class _NotesPageState extends State<NotesPage> {
       MaterialPageRoute(builder: (_) => const LoginPage()),
       (route) => false,
     );
+  }
+
+  Future<void> openTrash() async {
+    // A lixeira pode restaurar notas: ao voltar, recarregamos a lista
+    // e sincronizamos as alterações com a nuvem.
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => TrashPage(syncService: syncService)),
+    );
+
+    await loadNotes();
+    syncNotes();
   }
 
   Future<void> openNewNote() async {
@@ -202,6 +219,35 @@ class _NotesPageState extends State<NotesPage> {
         ),
 
         actions: [
+          PopupMenuButton<NoteSort>(
+            tooltip: 'Ordenar',
+            icon: const Icon(Icons.sort_rounded),
+            initialValue: sort,
+
+            onSelected: (value) {
+              sort = value;
+
+              loadNotes();
+            },
+
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: NoteSort.updatedAt,
+                child: Text('Última atualização'),
+              ),
+              PopupMenuItem(
+                value: NoteSort.createdAt,
+                child: Text('Data de criação'),
+              ),
+            ],
+          ),
+
+          IconButton(
+            tooltip: 'Lixeira',
+            onPressed: openTrash,
+            icon: const Icon(Icons.delete_sweep_outlined),
+          ),
+
           IconButton(
             tooltip: 'Sincronizar',
             onPressed: syncing ? null : () => syncNotes(),
@@ -383,6 +429,8 @@ class _NotesPageState extends State<NotesPage> {
                       onTap: () => openEditNote(note),
 
                       onDelete: () => deleteNote(note),
+
+                      showCreatedDate: sort == NoteSort.createdAt,
                     );
                   },
                 ),
