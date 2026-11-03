@@ -1,0 +1,24 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // O usuário autenticado só acessa o que está dentro do próprio "users/{uid}".
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    match /users/{userId}/notes/{noteId} {
+      allow read, delete: if isOwner(userId);
+
+      // Ao gravar, o documento precisa pertencer a quem está logado
+      // e ter os campos de texto com o tipo certo.
+      allow create, update: if isOwner(userId)
+        && request.resource.data.uid == userId
+        && request.resource.data.title is string
+        && request.resource.data.content is string;
+    }
+
+    // Qualquer outro caminho continua negado (comportamento padrão).
+  }
+}

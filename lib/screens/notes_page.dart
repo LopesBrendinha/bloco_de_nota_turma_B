@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import '../database/database_helper.dart';
 import '../models/note.dart';
 import '../services/auth_service.dart';
+import '../services/sync_service.dart';
 import '../widgets/note_card.dart';
 import 'login_page.dart';
 import 'note_form_page.dart';
+import 'trash_page.dart';
 
 class NotesPage extends StatefulWidget {
   const NotesPage({super.key});
@@ -16,17 +18,75 @@ class NotesPage extends StatefulWidget {
 }
 
 class _NotesPageState extends State<NotesPage> {
-  final DatabaseHelper database = DatabaseHelper.ínstance;
+  final DatabaseHelper database = DatabaseHelper.instance;
 
   final AuthService authService = AuthService();
 
+  final SyncService syncService = SyncService();
+
   List<Note> notes = [];
+
+  // true enquanto a sincronização com a nuvem está em andamento.
+  bool syncing = false;
+
+  // Pesquisa e filtro. A busca roda no SQLite, que após a sincronização
+  // tem uma cópia de todas as notas do usuário (inclusive as da nuvem).
+  final TextEditingController searchController = TextEditingController();
+
+  String query = '';
+
+  // null significa "Todas as categorias".
+  String? selectedCategory;
+
+  List<String> categories = [];
+
+  // Ordenação da lista: por última atualização (padrão) ou por criação.
+  NoteSort sort = NoteSort.updatedAt;
+
+  bool get isFiltering => query.trim().isNotEmpty || selectedCategory != null;
 
   @override
   void initState() {
     super.initState();
 
-    loadNotes();
+    start();
+  }
+
+  @override
+  void dispose() {
+    searchController.dispose();
+
+    super.dispose();
+  }
+
+  Future<void> start() async {
+    // Primeiro mostramos o que já existe no aparelho (rápido e
+    // funciona sem internet) e só depois sincronizamos com a nuvem.
+    await loadNotes();
+    await syncNotes();
+  }
+
+  Future<void> syncNotes() async {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null || syncing) return;
+
+    setState(() => syncing = true);
+
+    final report = await syncService.sync(user.uid);
+
+    if (!mounted) return;
+
+    setState(() => syncing = false);
+
+    // A nuvem pode ter trazido notas novas: recarregamos a lista.
+    await loadNotes();
+
+    if (!report.success && mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(report.message)));
+    }
   }
 
   Future<void> loadNotes() async {
@@ -38,31 +98,50 @@ class _NotesPageState extends State<NotesPage> {
     // não podemos buscar as notas.
     if (user == null) return;
 
-    // Enviamos o UID para o banco local.
+    // As categorias alimentam os chips de filtro.
+    await database.ensureDefaultCategories(user.uid);
+
+    final categoryList = await database.getCategories(user.uid);
+
+    // Enviamos o UID, o texto da pesquisa e a categoria escolhida.
     //
-    // O banco irá buscar somente as notas
-    // pertencentes a esse usuário.
-    final result = await database.getNotes(user.uid);
+    // O banco irá buscar somente as notas desse usuário que combinam
+    // com o título ou o conteúdo digitado e com a categoria.
+    final result = await database.getNotes(
+      user.uid,
+      query: query,
+      category: selectedCategory,
+      sort: sort,
+    );
 
     if (mounted) {
       // Atualizamos a lista utilizada
       // pela interface.
       setState(() {
+        categories = categoryList;
         notes = result;
       });
     }
   }
 
-  Future<void> deleteNote(int id) async {
-    // Enviamos o ID da nota para o banco.
-    //
-    // O banco executará:
-    //
-    // DELETE FROM notes
-    // WHERE id = ?
-    //
-    // O ? será substituído pelo ID.
-    await database.deleteNote(id);
+  void clearSearch() {
+    searchController.clear();
+
+    query = '';
+
+    loadNotes();
+  }
+
+  Future<void> deleteNote(Note note) async {
+    // A nota não é apagada: recebe a data de exclusão (deletedAt) e vai
+    // para a lixeira. Como é uma alteração como outra qualquer, ela
+    // também é sincronizada com a nuvem. Na tela da lixeira é possível
+    // restaurar a nota ou excluí-la definitivamente.
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    await database.upsertNote(
+      note.copyWith(deletedAt: now, updatedAt: now, synced: false),
+    );
 
     // Depois de excluir,
     // buscamos novamente as notas.
@@ -71,8 +150,10 @@ class _NotesPageState extends State<NotesPage> {
     if (mounted) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Nota excluída.')));
+      ).showSnackBar(const SnackBar(content: Text('Nota movida para a lixeira.')));
     }
+
+    syncNotes();
   }
 
   Future<void> logout() async {
@@ -87,6 +168,18 @@ class _NotesPageState extends State<NotesPage> {
     );
   }
 
+  Future<void> openTrash() async {
+    // A lixeira pode restaurar notas: ao voltar, recarregamos a lista
+    // e sincronizamos as alterações com a nuvem.
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => TrashPage(syncService: syncService)),
+    );
+
+    await loadNotes();
+    syncNotes();
+  }
+
   Future<void> openNewNote() async {
     // Abre a tela responsável pelo formulário.
     await Navigator.push(
@@ -95,8 +188,9 @@ class _NotesPageState extends State<NotesPage> {
     );
 
     // Quando o usuário voltar para essa página,
-    // buscamos novamente as notas.
+    // buscamos novamente as notas e enviamos a nova à nuvem.
     await loadNotes();
+    syncNotes();
   }
 
   Future<void> openEditNote(Note note) async {
@@ -108,8 +202,9 @@ class _NotesPageState extends State<NotesPage> {
     );
 
     // Quando retornar da edição,
-    // atualizamos a lista.
+    // atualizamos a lista e enviamos a alteração à nuvem.
     await loadNotes();
+    syncNotes();
   }
 
   @override
@@ -124,6 +219,47 @@ class _NotesPageState extends State<NotesPage> {
         ),
 
         actions: [
+          PopupMenuButton<NoteSort>(
+            tooltip: 'Ordenar',
+            icon: const Icon(Icons.sort_rounded),
+            initialValue: sort,
+
+            onSelected: (value) {
+              sort = value;
+
+              loadNotes();
+            },
+
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: NoteSort.updatedAt,
+                child: Text('Última atualização'),
+              ),
+              PopupMenuItem(
+                value: NoteSort.createdAt,
+                child: Text('Data de criação'),
+              ),
+            ],
+          ),
+
+          IconButton(
+            tooltip: 'Lixeira',
+            onPressed: openTrash,
+            icon: const Icon(Icons.delete_sweep_outlined),
+          ),
+
+          IconButton(
+            tooltip: 'Sincronizar',
+            onPressed: syncing ? null : () => syncNotes(),
+            icon: syncing
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.sync_rounded),
+          ),
+
           IconButton(
             tooltip: 'Sair',
             onPressed: logout,
@@ -161,13 +297,83 @@ class _NotesPageState extends State<NotesPage> {
               style: const TextStyle(color: Color(0xFF77717F), fontSize: 13),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
+
+            // Campo de pesquisa por título ou conteúdo.
+            TextField(
+              controller: searchController,
+
+              onChanged: (value) {
+                query = value;
+
+                loadNotes();
+              },
+
+              decoration: InputDecoration(
+                hintText: 'Pesquisar por título ou conteúdo',
+                prefixIcon: const Icon(Icons.search_rounded),
+                suffixIcon: query.isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: 'Limpar pesquisa',
+                        onPressed: clearSearch,
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // Filtro por categoria.
+            SizedBox(
+              height: 40,
+
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+
+                    child: ChoiceChip(
+                      label: const Text('Todas'),
+                      selected: selectedCategory == null,
+                      onSelected: (_) {
+                        selectedCategory = null;
+
+                        loadNotes();
+                      },
+                    ),
+                  ),
+
+                  for (final category in categories)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+
+                      child: ChoiceChip(
+                        label: Text(category),
+                        selected: selectedCategory == category,
+                        onSelected: (_) {
+                          selectedCategory = category;
+
+                          loadNotes();
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 12),
 
             if (notes.isEmpty)
               Expanded(
+                // O SingleChildScrollView evita faixa de erro de layout
+                // quando o teclado da pesquisa reduz o espaço da tela.
                 child: Center(
+                  child: SingleChildScrollView(
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
 
                     children: [
                       Container(
@@ -188,9 +394,9 @@ class _NotesPageState extends State<NotesPage> {
 
                       const SizedBox(height: 25),
 
-                      const Text(
-                        'Nenhuma nota ainda',
-                        style: TextStyle(
+                      Text(
+                        isFiltering ? 'Nenhum resultado' : 'Nenhuma nota ainda',
+                        style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                         ),
@@ -198,11 +404,14 @@ class _NotesPageState extends State<NotesPage> {
 
                       const SizedBox(height: 8),
 
-                      const Text(
-                        'Crie sua primeira nota.',
-                        style: TextStyle(color: Color(0xFF77717F)),
+                      Text(
+                        isFiltering
+                            ? 'Tente outro termo ou outra categoria.'
+                            : 'Crie sua primeira nota.',
+                        style: const TextStyle(color: Color(0xFF77717F)),
                       ),
                     ],
+                  ),
                   ),
                 ),
               )
@@ -219,7 +428,9 @@ class _NotesPageState extends State<NotesPage> {
 
                       onTap: () => openEditNote(note),
 
-                      onDelete: () => deleteNote(note.id!),
+                      onDelete: () => deleteNote(note),
+
+                      showCreatedDate: sort == NoteSort.createdAt,
                     );
                   },
                 ),
