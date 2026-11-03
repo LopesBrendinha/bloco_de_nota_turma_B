@@ -1,7 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-import '../database/database_helper.dart';
+import '../repositories/note_repository.dart';
 import '../models/note.dart';
 import '../services/auth_service.dart';
 import '../widgets/note_card.dart';
@@ -16,17 +16,54 @@ class NotesPage extends StatefulWidget {
 }
 
 class _NotesPageState extends State<NotesPage> {
-  final DatabaseHelper database = DatabaseHelper.ínstance;
+  final NoteRepository repository = NoteRepository();
 
   final AuthService authService = AuthService();
 
   List<Note> notes = [];
+
+  bool offline = false;
+
+  String searchQuery = '';
 
   @override
   void initState() {
     super.initState();
 
     loadNotes();
+    syncNotes();
+  }
+
+  String normalize(String text) {
+    const accents = {
+      'a': 'áàãâä',
+      'e': 'éèêë',
+      'i': 'íìîï',
+      'o': 'óòõôö',
+      'u': 'úùûü',
+      'c': 'ç',
+    };
+
+    var result = text.toLowerCase();
+
+    accents.forEach((letter, accented) {
+      for (var variant in accented.split('')) {
+        result = result.replaceAll(variant, letter);
+      }
+    });
+
+    return result;
+  }
+
+  List<Note> get filteredNotes {
+    final query = normalize(searchQuery.trim());
+
+    if (query.isEmpty) return notes;
+
+    return notes.where((note) {
+      return normalize(note.title).contains(query) ||
+          normalize(note.content).contains(query);
+    }).toList();
   }
 
   Future<void> loadNotes() async {
@@ -42,7 +79,7 @@ class _NotesPageState extends State<NotesPage> {
     //
     // O banco irá buscar somente as notas
     // pertencentes a esse usuário.
-    final result = await database.getNotes(user.uid);
+    final result = await repository.getNotes(user.uid);
 
     if (mounted) {
       // Atualizamos a lista utilizada
@@ -53,25 +90,65 @@ class _NotesPageState extends State<NotesPage> {
     }
   }
 
-  Future<void> deleteNote(int id) async {
-    // Enviamos o ID da nota para o banco.
-    //
-    // O banco executará:
-    //
-    // DELETE FROM notes
-    // WHERE id = ?
-    //
-    // O ? será substituído pelo ID.
-    await database.deleteNote(id);
+  Future<void> syncNotes() async {
+    final user = FirebaseAuth.instance.currentUser;
 
-    // Depois de excluir,
-    // buscamos novamente as notas.
+    if (user == null) return;
+
+    final online = await repository.sync(user.uid);
+
     await loadNotes();
 
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Nota excluída.')));
+      setState(() {
+        offline = !online;
+      });
+    }
+  }
+
+  Future<void> deleteNote(Note note) async {
+    setState(() {
+      notes.remove(note);
+    });
+
+    final sent = await repository.deleteNote(note);
+
+    await loadNotes();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            sent
+              ? 'Nota excluída com sucesso.'
+              : 'Nota foi excluída localmente, e será removida do servidor quando houver conexão.',
+          )
+        )
+      );
+    }
+  }
+
+  Future<void> toggleCompleted(Note note, bool completed) async {
+    final updated = note.copyWith(completed: completed);
+
+    setState(() {
+      final index = notes.indexWhere((item) => item.id == note.id);
+
+      if (index != -1) {
+        notes[index] = updated;
+      }
+    });
+
+    final sent = await repository.saveNote(updated);
+
+    await loadNotes();
+
+    if (mounted && !sent) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Sem conexão: nota será sincronizada quando houver conexão.'),
+        ),
+      );
     }
   }
 
@@ -116,6 +193,8 @@ class _NotesPageState extends State<NotesPage> {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
 
+    final visibleNotes = filteredNotes;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -124,6 +203,11 @@ class _NotesPageState extends State<NotesPage> {
         ),
 
         actions: [
+          IconButton(
+            tooltip: 'Sincronizar',
+            onPressed: syncNotes,
+            icon: const Icon(Icons.sync_rounded)
+          ),
           IconButton(
             tooltip: 'Sair',
             onPressed: logout,
@@ -162,6 +246,44 @@ class _NotesPageState extends State<NotesPage> {
             ),
 
             const SizedBox(height: 20),
+
+            if (offline)
+              Container(
+                width: double.infinity,
+                margin: EdgeInsets.only(bottom: 20),
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Color(0xFFFFF4E5),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.cloud_off_rounded, color: Color(0xFFB26A00)),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Você está offline. Mostrando notas salvas no dispositivo.',
+                        style: TextStyle(color: Color(0xFF8A5300)),
+                      ),
+                    ),
+                  ]
+                )
+              ),
+
+            TextField(
+              decoration: InputDecoration(
+                hintText: 'Pesquisar notas...',
+                prefixIcon: Icon(Icons.search_rounded),
+              ),
+              onChanged: (value) {
+                setState(() {
+                  searchQuery = value;
+                });
+              },
+              onTapOutside: (_) => FocusScope.of(context).unfocus(),
+            ),
+
+            SizedBox(height: 20,),
 
             if (notes.isEmpty)
               Expanded(
@@ -206,23 +328,35 @@ class _NotesPageState extends State<NotesPage> {
                   ),
                 ),
               )
+            else if (visibleNotes.isEmpty)
+              Expanded(
+                child: Center(
+                  child: Text(
+                    'Nenhuma nota encontrada para a pesquisa "$searchQuery".',
+                    style: TextStyle(color: Color(0xFF77717F)),
+                  )
+                )
+              )
             else
               Expanded(
-                child: ListView.builder(
-                  itemCount: notes.length,
+                child: RefreshIndicator(
+                  onRefresh: syncNotes,
+                  child: ListView.builder(
+                    itemCount: visibleNotes.length,
 
-                  itemBuilder: (context, index) {
-                    final note = notes[index];
+                    itemBuilder: (context, index) {
+                      final note = visibleNotes[index];
 
-                    return NoteCard(
-                      note: note,
-
-                      onTap: () => openEditNote(note),
-
-                      onDelete: () => deleteNote(note.id!),
-                    );
-                  },
-                ),
+                      return NoteCard(
+                        note: note,
+                        onTap: () => openEditNote(note),
+                        onDelete: () => deleteNote(note),
+                        onCompletedChanged: (completed) =>
+                            toggleCompleted(note, completed),
+                      );
+                    },
+                  ),
+                )
               ),
           ],
         ),

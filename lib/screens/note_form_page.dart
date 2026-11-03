@@ -1,6 +1,6 @@
 
 
-import 'package:blocodenotasturmab/database/database_helper.dart';
+import 'package:blocodenotasturmab/repositories/note_repository.dart';
 import 'package:blocodenotasturmab/models/note.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -19,19 +19,31 @@ class _NoteFormPageState extends State<NoteFormPage> {
 
   final contentController = TextEditingController();
 
-  final database = DatabaseHelper.instance;
+  final repository = NoteRepository();
+
+  bool saving = false;
 
   bool get isEditing => widget.note != null;
+
+  static const newCategoryOption = '__nova_categoria__';
+
+  List<String> categories = [];
+
+  String selectedCategory = '';
 
   @override
   void initState() {
     super.initState();
 
+
     if (isEditing) {
       titleController.text = widget.note!.title;
 
       contentController.text = widget.note!.content;
+      selectedCategory = widget.note?.category ?? '';
     }
+
+    loadCategories();
   }
 
   Future<void> saveNote() async {
@@ -50,6 +62,10 @@ class _NoteFormPageState extends State<NoteFormPage> {
     if (content.isEmpty) {
       return;
     }
+
+    setState(() {
+      saving = true;
+    });
 
     // Criamos a data da alteração.
     final now = DateTime.now();
@@ -71,27 +87,109 @@ class _NoteFormPageState extends State<NoteFormPage> {
     //     o ID será null.
     final note = Note(
       id: widget.note?.id,
+      remoteId: widget.note?.remoteId,
       uid: user.uid,
       title: title,
+      category: selectedCategory,
       content: content,
       date: date,
+      completed: widget.note?.completed ?? false,
     );
 
-    // Verificamos se estamos criando
-    // ou editando uma nota.
-    if (isEditing) {
-      // UPDATE
-      await database.updateNote(note);
-    } else {
-      // INSERT
-      await database.insertNote(note);
+    final sent = await repository.saveNote(note);
+
+    if (!mounted) return;
+
+    if (!sent) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Sem conexão: nota será sincronizada quando houver conexão.'),
+        ),
+      );
     }
 
-    // Depois de salvar,
-    // voltamos para a tela anterior.
-    if (mounted) {
-      Navigator.pop(context);
+    Navigator.pop(context);
+  }
+
+  Future<void> loadCategories() async {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) return;
+
+    final result = await repository.getCategories(user.uid);
+
+    if (!mounted) return;
+
+    setState(() {
+      categories = result;
+      selectCategory(selectedCategory);
+    });
+  }
+
+  void selectCategory(String name) {
+    if (name.isEmpty) {
+      selectedCategory = '';
+      return;
     }
+
+    final index = categories.indexWhere(
+      (category) => category.toLowerCase() == name.toLowerCase(),
+    );
+
+    if (index == -1) {
+      categories.add(name);
+      selectedCategory = name;
+    } else {
+      selectedCategory = categories[index];
+    }
+  }
+
+  Future<String?> askCategoryName() {
+    var name = '';
+
+    return showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Nova Categoria'),
+        content: TextField(
+          autofocus: true,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(
+            hintText: 'Nome da categoria',
+          ),
+          onChanged: (value) => name = value,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, name.trim()),
+            child: const Text('Criar'),
+          )
+        ]
+      )
+    );
+  }
+
+  Future<void> onCategoryChanged(String? value) async {
+    if (value == null) return;
+
+    if (value != newCategoryOption) {
+      setState(() {
+        selectedCategory = value;
+      });
+      return;
+    }
+
+    final name = await askCategoryName();
+
+    if (name == null || name.isEmpty || !mounted) return;
+
+    setState(() {
+      selectCategory(name);
+    });
   }
 
   @override
@@ -113,8 +211,14 @@ class _NoteFormPageState extends State<NoteFormPage> {
 
         actions: [
           IconButton(
-            onPressed: saveNote,
-            icon: const Icon(Icons.check_rounded),
+            onPressed: saving ? null : saveNote,
+            icon: saving ? 
+              const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2.0,)
+              )
+              : const Icon(Icons.save_rounded),
           ),
 
           const SizedBox(width: 8),
@@ -144,6 +248,26 @@ class _NoteFormPageState extends State<NoteFormPage> {
             ),
 
             const Divider(color: Color(0xFFE4DFEA)),
+
+            if (categories.isNotEmpty)
+              DropdownButton<String>(
+                value: selectedCategory,
+                isExpanded: true,
+                underline: SizedBox.shrink(),
+                items: [
+                  DropdownMenuItem(
+                    value: '',
+                    child: Text('Sem categoria')
+                  ),
+                  for (final category in categories)
+                    DropdownMenuItem(value: category, child: Text(category)),
+                  DropdownMenuItem(
+                    value: newCategoryOption,
+                    child: Text('+ Nova categoria'),
+                  )
+                ],
+                onChanged: onCategoryChanged,
+              ),
 
             Expanded(
               child: TextField(
