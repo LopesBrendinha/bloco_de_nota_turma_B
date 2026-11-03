@@ -1,5 +1,8 @@
 import 'package:blocodenotasturmab/firebase_options.dart';
 import 'package:blocodenotasturmab/screens/login_page.dart';
+import 'package:blocodenotasturmab/screens/notes_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
@@ -8,6 +11,8 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  // O cache offline fica a cargo do SQLite; assim o Firestore só responde com dados do servidor.
+  FirebaseFirestore.instance.settings = const Settings(persistenceEnabled: false);
   runApp(const MyApp());
 }
 
@@ -20,7 +25,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
 
-      title: 'Flutter Demo',
+      title: 'Bloco de Notas',
       theme: ThemeData(
         useMaterial3: true,
 
@@ -75,7 +80,10 @@ class MyApp extends StatelessWidget {
 
         
       ),
-      home: LoginPage(),
+      // Sessão do Firebase Auth persiste: quem já entrou vai direto para as notas.
+      home: FirebaseAuth.instance.currentUser == null
+          ? const LoginPage()
+          : const NotesPage(),
     );
   }
 }
