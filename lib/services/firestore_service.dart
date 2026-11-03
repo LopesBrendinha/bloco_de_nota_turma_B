@@ -30,8 +30,16 @@ class FirestoreService {
   }
 
   /// Baixa todas as notas do usuário, inclusive as da lixeira.
+  ///
+  /// A leitura é feita sempre no servidor (Source.server). Sem isso, o
+  /// Firestore poderia devolver uma cópia antiga guardada no aparelho
+  /// quando estiver offline, e a sincronização trataria como se fosse
+  /// o estado real da nuvem. Assim, sem conexão a leitura falha e o
+  /// SyncService mostra o aviso de erro.
   Future<List<Note>> fetchNotes(String uid) async {
-    final snapshot = await _notes(uid).get().timeout(_timeout);
+    final snapshot = await _notes(
+      uid,
+    ).get(const GetOptions(source: Source.server)).timeout(_timeout);
 
     return snapshot.docs
         .map((doc) => Note.fromFirestore(doc.id, doc.data()))
