@@ -11,6 +11,7 @@ import '../widgets/note_card.dart';
 import '../widgets/sync_status_banner.dart';
 import 'categories_page.dart';
 import 'note_form_page.dart';
+import 'trash_page.dart';
 
 class NotesPage extends StatefulWidget {
   final NotesRepository repository;
@@ -119,17 +120,20 @@ class _NotesPageState extends State<NotesPage> with WidgetsBindingObserver {
     return null;
   }
 
-  Future<void> deleteNote(Note note) async {
-    final confirmed = await confirmAction(
-      context,
-      title: 'Excluir nota?',
-      message: 'A nota será apagada deste aparelho e da nuvem.',
-      confirmLabel: 'Excluir',
-    );
+  Future<void> moveToTrash(Note note) async {
+    await repository.moveToTrash(note.id);
 
-    if (confirmed) {
-      await repository.deleteNotePermanently(note.id);
-    }
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Nota movida para a lixeira.'),
+        action: SnackBarAction(
+          label: 'Desfazer',
+          onPressed: () => repository.restoreNote(note.id),
+        ),
+      ),
+    );
   }
 
   Future<void> logout() async {
@@ -157,6 +161,13 @@ class _NotesPageState extends State<NotesPage> with WidgetsBindingObserver {
       MaterialPageRoute(
         builder: (_) => NoteFormPage(repository: repository, note: note),
       ),
+    );
+  }
+
+  void openTrash() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => TrashPage(repository: repository)),
     );
   }
 
@@ -191,6 +202,12 @@ class _NotesPageState extends State<NotesPage> with WidgetsBindingObserver {
             tooltip: 'Categorias',
             onPressed: openCategories,
             icon: const Icon(Icons.label_outline_rounded),
+          ),
+
+          IconButton(
+            tooltip: 'Lixeira',
+            onPressed: openTrash,
+            icon: const Icon(Icons.delete_outline_rounded),
           ),
 
           IconButton(
@@ -337,8 +354,8 @@ class _NotesPageState extends State<NotesPage> with WidgetsBindingObserver {
 
                   actions: [
                     IconButton(
-                      tooltip: 'Excluir',
-                      onPressed: () => deleteNote(note),
+                      tooltip: 'Mover para a lixeira',
+                      onPressed: () => moveToTrash(note),
                       icon: const Icon(
                         Icons.delete_outline_rounded,
                         color: Color(0xffb45f6c),
