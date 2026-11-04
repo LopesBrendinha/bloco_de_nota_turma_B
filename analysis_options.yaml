@@ -13,6 +13,7 @@ analyzer:
     - android/**
     - ios/**
     - web/**
+    - firestore_rules_test/**
 include: package:flutter_lints/flutter.yaml
 
 linter:
