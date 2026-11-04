@@ -210,10 +210,21 @@ Se qualquer etapa falhar, `sync` retorna `false`, os dados locais ficam intactos
 
 ## Capturas de tela
 
-> Coloque as imagens em `docs/screenshots/` com os nomes abaixo.
+### Aplicativo
+**Tela de login**
 
-| Tela | Arquivo |
-|---|---|
+![login](docs/screenshots/01-login.jpg)
+
+### Evidências no Firebase
+**Firestore:** notas gravadas em `users/{uid}/notes`, uma subcoleção por usuário
+
+![firestore](docs/screenshots/06-firestore.png)
+
+**Authentication:** conta criada pelo app (e-mail/senha)
+
+![auth](docs/screenshots/07-auth.png)
+
+---|---|
 | Login | ![login](docs/screenshots/01-login.png) |
 | Lista com categorias e pesquisa | ![lista](docs/screenshots/02-lista.png) |
 | Formulário com categorias | ![form](docs/screenshots/03-formulario.png) |
