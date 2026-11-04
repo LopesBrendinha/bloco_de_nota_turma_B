@@ -3,7 +3,7 @@ import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
 class DatabaseHelper {
-  static final DatabaseHelper instace = DatabaseHelper._init();
+  static final DatabaseHelper instance = DatabaseHelper._init();
 
   static Database? _database;
 
@@ -39,13 +39,13 @@ class DatabaseHelper {
   }
 
   Future<int> insertNote(Note note) async {
-    final db = await instace.database;
+    final db = await instance.database;
 
     return await db.insert('notes', note.toMap());
   }
 
   Future<List<Note>> getNotes(String uid) async{
-    final db = await instace.database;
+    final db = await instance.database;
 
     final result = await db.query(
       'notes',
@@ -58,7 +58,7 @@ class DatabaseHelper {
   }
 
   Future<int> updateNote(Note note) async{
-    final db = await instace.database;
+    final db = await instance.database;
 
     return await db.update(
       'notes',
@@ -71,7 +71,7 @@ class DatabaseHelper {
   }
 
   Future<int> deleteNote(int id) async{
-    final db = await instace.database;
+    final db = await instance.database;
 
     return await db.delete(
       'notes',
