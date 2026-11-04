@@ -270,4 +270,43 @@ Os testes usam um SQLite real em arquivo temporário e uma nuvem falsa.
 
 ## Capturas de tela
 
-<!-- SCREENSHOTS -->
+### Aplicativo
+
+| Login | Cadastro | Lista de notas |
+| --- | --- | --- |
+| <img src="docs/screenshots/01-login.png" width="230"> | <img src="docs/screenshots/02-cadastro.png" width="230"> | <img src="docs/screenshots/03-notas.png" width="230"> |
+
+| Filtro por categoria | Pesquisa | Nova categoria |
+| --- | --- | --- |
+| <img src="docs/screenshots/04-filtro-categoria.png" width="230"> | <img src="docs/screenshots/05-pesquisa.png" width="230"> | <img src="docs/screenshots/06-nova-categoria.png" width="230"> |
+
+| Lixeira | Erro de conexão no login | Nota recuperada da nuvem |
+| --- | --- | --- |
+| <img src="docs/screenshots/07-lixeira.png" width="230"> | <img src="docs/screenshots/08-sem-internet.png" width="230"> | <img src="docs/screenshots/09-nota-recuperada.png" width="230"> |
+
+A última imagem foi capturada depois de limpar o armazenamento do aplicativo no
+Android, o que simula uma instalação nova. Ao entrar com a mesma conta, a nota
+foi baixada do Firestore.
+
+### Firebase
+
+**Usuário criado no Firebase Authentication:**
+
+<img src="docs/screenshots/10-firebase-authentication.png" width="600">
+
+**Nota armazenada no Cloud Firestore, em `users/{uid}/notes/{noteId}`:**
+
+<img src="docs/screenshots/11-firebase-nota.png" width="600">
+
+## Como foi verificado
+
+- **`flutter analyze`:** sem problemas.
+- **`flutter test`:** 79 testes aprovados.
+- **Emulador Android (API 36), com o Firebase real:** cadastro, login, criação de
+  notas, categorias padrão, pesquisa, filtro, lixeira com recuperação, mensagem de
+  erro sem internet e recuperação da nota após limpar o aplicativo.
+- **Regras de segurança:** compiladas e publicadas com `firebase deploy`. O acesso
+  do dono aos próprios dados foi usado nos testes acima.
+- **Somente nos testes automatizados, com a nuvem simulada:** envio posterior de
+  notas criadas sem internet, conflitos entre aparelhos, exclusão em outro aparelho
+  e categorias criadas pelo usuário na sincronização.
