@@ -43,3 +43,13 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Firebase / Node (testes de regras)
+node_modules/
+.firebase/
+*-debug.log
+
+# Segredos: nunca versionar
+serviceAccount*.json
+*.pem
+.env
