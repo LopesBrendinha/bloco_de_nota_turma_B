@@ -1,18 +1,52 @@
+import 'package:blocodenotasturmab/database/database_helper.dart';
 import 'package:blocodenotasturmab/firebase_options.dart';
-import 'package:blocodenotasturmab/screens/login_page.dart';
+import 'package:blocodenotasturmab/repositories/notes_repository.dart';
+import 'package:blocodenotasturmab/screens/auth_gate.dart';
+import 'package:blocodenotasturmab/services/auth_service.dart';
+import 'package:blocodenotasturmab/services/firestore_data_source.dart';
+import 'package:blocodenotasturmab/services/sync_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:path/path.dart';
+import 'package:sqflite/sqflite.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  runApp(const MyApp());
+
+  // O SQLite já é o armazenamento offline do aplicativo. Com o cache do
+  // Firestore ligado, existiriam duas filas de escrita, e uma nota salva sem
+  // internet pareceria enviada sem ter chegado à nuvem.
+  final firestore = FirebaseFirestore.instance;
+  firestore.settings = const Settings(persistenceEnabled: false);
+
+  // Todas as dependências são criadas aqui e entregues por construtor.
+  final database = DatabaseHelper(
+    databaseFactory,
+    join(await getDatabasesPath(), 'notes.db'),
+  );
+  final syncService = SyncService(database, FirestoreDataSource(firestore));
+
+  runApp(
+    MyApp(
+      repository: NotesRepository(database, syncService),
+      authService: AuthService(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final NotesRepository repository;
+  final AuthService authService;
+
+  const MyApp({
+    super.key,
+    required this.repository,
+    required this.authService,
+  });
 
 
   @override
@@ -20,7 +54,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
 
-      title: 'Flutter Demo',
+      title: 'Bloco de Notas',
       theme: ThemeData(
         useMaterial3: true,
 
@@ -75,7 +109,7 @@ class MyApp extends StatelessWidget {
 
         
       ),
-      home: LoginPage(),
+      home: AuthGate(repository: repository, authService: authService),
     );
   }
 }

@@ -1,14 +1,14 @@
-
-
-import 'package:blocodenotasturmab/database/database_helper.dart';
-import 'package:blocodenotasturmab/models/note.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../models/note.dart';
+import '../repositories/notes_repository.dart';
 
 class NoteFormPage extends StatefulWidget {
+  final NotesRepository repository;
   final Note? note;
 
-  const NoteFormPage({super.key, this.note});
+  const NoteFormPage({super.key, required this.repository, this.note});
 
   @override
   State<NoteFormPage> createState() => _NoteFormPageState();
@@ -19,7 +19,7 @@ class _NoteFormPageState extends State<NoteFormPage> {
 
   final contentController = TextEditingController();
 
-  final database = DatabaseHelper.instance;
+  bool saving = false;
 
   bool get isEditing => widget.note != null;
 
@@ -35,12 +35,6 @@ class _NoteFormPageState extends State<NoteFormPage> {
   }
 
   Future<void> saveNote() async {
-    // Pegamos o usuário atualmente autenticado.
-    final user = FirebaseAuth.instance.currentUser;
-
-    // Sem usuário não podemos salvar.
-    if (user == null) return;
-
     // Pegamos os valores digitados.
     final title = titleController.text.trim();
 
@@ -48,50 +42,41 @@ class _NoteFormPageState extends State<NoteFormPage> {
 
     // Verificamos se existe conteúdo.
     if (content.isEmpty) {
+      showMessage('Escreva o conteúdo da nota.');
       return;
     }
 
-    // Criamos a data da alteração.
-    final now = DateTime.now();
+    setState(() {
+      saving = true;
+    });
 
-    final date =
-        '${now.day.toString().padLeft(2, '0')}/'
-        '${now.month.toString().padLeft(2, '0')}/'
-        '${now.year} '
-        '${now.hour.toString().padLeft(2, '0')}:'
-        '${now.minute.toString().padLeft(2, '0')}';
+    try {
+      // A nota é salva no SQLite e funciona sem internet.
+      // O envio para o Firestore acontece depois, em segundo plano.
+      await widget.repository.saveNote(
+        id: widget.note?.id,
+        title: title,
+        content: content,
+        categoryId: widget.note?.categoryId,
+      );
 
-    // Criamos um objeto Note.
-    //
-    // Se estamos editando:
-    //     widget.note?.id
-    // mantém o ID existente.
-    //
-    // Se estamos criando:
-    //     o ID será null.
-    final note = Note(
-      id: widget.note?.id,
-      uid: user.uid,
-      title: title,
-      content: content,
-      date: date,
-    );
-
-    // Verificamos se estamos criando
-    // ou editando uma nota.
-    if (isEditing) {
-      // UPDATE
-      await database.updateNote(note);
-    } else {
-      // INSERT
-      await database.insertNote(note);
+      // Depois de salvar,
+      // voltamos para a tela anterior.
+      if (mounted) {
+        Navigator.pop(context);
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          saving = false;
+        });
+        showMessage('Não foi possível salvar a nota.');
+      }
     }
+  }
 
-    // Depois de salvar,
-    // voltamos para a tela anterior.
-    if (mounted) {
-      Navigator.pop(context);
-    }
+  void showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -113,7 +98,8 @@ class _NoteFormPageState extends State<NoteFormPage> {
 
         actions: [
           IconButton(
-            onPressed: saveNote,
+            tooltip: 'Salvar',
+            onPressed: saving ? null : saveNote,
             icon: const Icon(Icons.check_rounded),
           ),
 
@@ -128,6 +114,10 @@ class _NoteFormPageState extends State<NoteFormPage> {
           children: [
             TextField(
               controller: titleController,
+
+              inputFormatters: [
+                LengthLimitingTextInputFormatter(Note.maxTitleLength),
+              ],
 
               style: const TextStyle(
                 fontSize: 24,
@@ -152,6 +142,10 @@ class _NoteFormPageState extends State<NoteFormPage> {
                 maxLines: null,
 
                 expands: true,
+
+                inputFormatters: [
+                  LengthLimitingTextInputFormatter(Note.maxContentLength),
+                ],
 
                 textAlignVertical: TextAlignVertical.top,
 
