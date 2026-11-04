@@ -17,13 +17,18 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      return web;
+      throw UnsupportedError(
+        'O aplicativo usa SQLite e não funciona na web.',
+      );
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
-        return ios;
+        throw UnsupportedError(
+          'DefaultFirebaseOptions have not been configured for ios - '
+          'you can reconfigure this by running the FlutterFire CLI again.',
+        );
       case TargetPlatform.macOS:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for macos - '
@@ -46,30 +51,11 @@ class DefaultFirebaseOptions {
     }
   }
 
-  static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyDlQfZ1poYgiLByul2YBTQZ04nr5d6Y1SE',
-    appId: '1:363520809972:web:2409763c5411199d1637a1',
-    messagingSenderId: '363520809972',
-    projectId: 'bdbloco',
-    authDomain: 'bdbloco.firebaseapp.com',
-    storageBucket: 'bdbloco.firebasestorage.app',
-    measurementId: 'G-ETWN1N8W68',
-  );
-
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyBxyB_nAaX3iEQdW-1h_z3DkCDjlLRzb2k',
-    appId: '1:363520809972:android:6a7d83d420af207e1637a1',
-    messagingSenderId: '363520809972',
-    projectId: 'bdbloco',
-    storageBucket: 'bdbloco.firebasestorage.app',
-  );
-
-  static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyCs1qR2RbjcOC2yZToF0JJcLJ_zdVJTvFo',
-    appId: '1:363520809972:ios:444022bea38a40a51637a1',
-    messagingSenderId: '363520809972',
-    projectId: 'bdbloco',
-    storageBucket: 'bdbloco.firebasestorage.app',
-    iosBundleId: 'com.example.blocodenotasturmab',
+    apiKey: 'AIzaSyDvLm1lCCNNb4Xmm928PZP_24blTHC9e-E',
+    appId: '1:790543007648:android:08bff2918eba3691d7aec5',
+    messagingSenderId: '790543007648',
+    projectId: 'bloco-de-notas-36ede',
+    storageBucket: 'bloco-de-notas-36ede.firebasestorage.app',
   );
 }

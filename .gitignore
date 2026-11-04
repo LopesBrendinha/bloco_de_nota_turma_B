@@ -43,3 +43,13 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Segredos e arquivos locais do Firebase (nunca versionar)
+.env
+.env.*
+.firebase/
+*firebase-adminsdk*.json
+*service-account*.json
+serviceAccount*.json
+firebase-debug.log
+firestore-debug.log

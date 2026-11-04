@@ -1,14 +1,16 @@
-
-
-import 'package:blocodenotasturmab/database/database_helper.dart';
-import 'package:blocodenotasturmab/models/note.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../models/note.dart';
+import '../models/note_category.dart';
+import '../repositories/notes_repository.dart';
+import '../widgets/create_category_dialog.dart';
 
 class NoteFormPage extends StatefulWidget {
+  final NotesRepository repository;
   final Note? note;
 
-  const NoteFormPage({super.key, this.note});
+  const NoteFormPage({super.key, required this.repository, this.note});
 
   @override
   State<NoteFormPage> createState() => _NoteFormPageState();
@@ -19,7 +21,11 @@ class _NoteFormPageState extends State<NoteFormPage> {
 
   final contentController = TextEditingController();
 
-  final database = DatabaseHelper.instance;
+  List<NoteCategory> categories = [];
+
+  String? selectedCategoryId;
+
+  bool saving = false;
 
   bool get isEditing => widget.note != null;
 
@@ -31,16 +37,41 @@ class _NoteFormPageState extends State<NoteFormPage> {
       titleController.text = widget.note!.title;
 
       contentController.text = widget.note!.content;
+
+      selectedCategoryId = widget.note!.categoryId;
+    }
+
+    loadCategories();
+  }
+
+  Future<void> loadCategories() async {
+    final result = await widget.repository.getCategories();
+
+    if (mounted) {
+      setState(() {
+        categories = result;
+
+        // A categoria pode ter sido apagada em outro aparelho.
+        if (!categories.any((item) => item.id == selectedCategoryId)) {
+          selectedCategoryId = null;
+        }
+      });
+    }
+  }
+
+  Future<void> createCategory() async {
+    final category = await showCreateCategoryDialog(
+      context,
+      widget.repository,
+    );
+
+    if (category != null) {
+      selectedCategoryId = category.id;
+      await loadCategories();
     }
   }
 
   Future<void> saveNote() async {
-    // Pegamos o usuário atualmente autenticado.
-    final user = FirebaseAuth.instance.currentUser;
-
-    // Sem usuário não podemos salvar.
-    if (user == null) return;
-
     // Pegamos os valores digitados.
     final title = titleController.text.trim();
 
@@ -48,50 +79,41 @@ class _NoteFormPageState extends State<NoteFormPage> {
 
     // Verificamos se existe conteúdo.
     if (content.isEmpty) {
+      showMessage('Escreva o conteúdo da nota.');
       return;
     }
 
-    // Criamos a data da alteração.
-    final now = DateTime.now();
+    setState(() {
+      saving = true;
+    });
 
-    final date =
-        '${now.day.toString().padLeft(2, '0')}/'
-        '${now.month.toString().padLeft(2, '0')}/'
-        '${now.year} '
-        '${now.hour.toString().padLeft(2, '0')}:'
-        '${now.minute.toString().padLeft(2, '0')}';
+    try {
+      // A nota é salva no SQLite e funciona sem internet.
+      // O envio para o Firestore acontece depois, em segundo plano.
+      await widget.repository.saveNote(
+        id: widget.note?.id,
+        title: title,
+        content: content,
+        categoryId: selectedCategoryId,
+      );
 
-    // Criamos um objeto Note.
-    //
-    // Se estamos editando:
-    //     widget.note?.id
-    // mantém o ID existente.
-    //
-    // Se estamos criando:
-    //     o ID será null.
-    final note = Note(
-      id: widget.note?.id,
-      uid: user.uid,
-      title: title,
-      content: content,
-      date: date,
-    );
-
-    // Verificamos se estamos criando
-    // ou editando uma nota.
-    if (isEditing) {
-      // UPDATE
-      await database.updateNote(note);
-    } else {
-      // INSERT
-      await database.insertNote(note);
+      // Depois de salvar,
+      // voltamos para a tela anterior.
+      if (mounted) {
+        Navigator.pop(context);
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          saving = false;
+        });
+        showMessage('Não foi possível salvar a nota.');
+      }
     }
+  }
 
-    // Depois de salvar,
-    // voltamos para a tela anterior.
-    if (mounted) {
-      Navigator.pop(context);
-    }
+  void showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -113,7 +135,8 @@ class _NoteFormPageState extends State<NoteFormPage> {
 
         actions: [
           IconButton(
-            onPressed: saveNote,
+            tooltip: 'Salvar',
+            onPressed: saving ? null : saveNote,
             icon: const Icon(Icons.check_rounded),
           ),
 
@@ -128,6 +151,10 @@ class _NoteFormPageState extends State<NoteFormPage> {
           children: [
             TextField(
               controller: titleController,
+
+              inputFormatters: [
+                LengthLimitingTextInputFormatter(Note.maxTitleLength),
+              ],
 
               style: const TextStyle(
                 fontSize: 24,
@@ -145,6 +172,51 @@ class _NoteFormPageState extends State<NoteFormPage> {
 
             const Divider(color: Color(0xFFE4DFEA)),
 
+            Row(
+              children: [
+                const Icon(
+                  Icons.label_outline_rounded,
+                  size: 20,
+                  color: Color(0xFF77717F),
+                ),
+
+                const SizedBox(width: 10),
+
+                Expanded(
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String?>(
+                      isExpanded: true,
+                      value: selectedCategoryId,
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('Sem categoria'),
+                        ),
+                        for (final category in categories)
+                          DropdownMenuItem<String?>(
+                            value: category.id,
+                            child: Text(category.name),
+                          ),
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          selectedCategoryId = value;
+                        });
+                      },
+                    ),
+                  ),
+                ),
+
+                TextButton.icon(
+                  onPressed: createCategory,
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('Nova'),
+                ),
+              ],
+            ),
+
+            const Divider(color: Color(0xFFE4DFEA)),
+
             Expanded(
               child: TextField(
                 controller: contentController,
@@ -152,6 +224,10 @@ class _NoteFormPageState extends State<NoteFormPage> {
                 maxLines: null,
 
                 expands: true,
+
+                inputFormatters: [
+                  LengthLimitingTextInputFormatter(Note.maxContentLength),
+                ],
 
                 textAlignVertical: TextAlignVertical.top,
 

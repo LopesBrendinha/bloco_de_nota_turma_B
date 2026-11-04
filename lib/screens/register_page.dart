@@ -2,7 +2,9 @@ import 'package:blocodenotasturmab/services/auth_service.dart';
 import 'package:flutter/material.dart';
 
 class RegisterPage extends StatefulWidget {
-  const RegisterPage({super.key});
+  final AuthService authService;
+
+  const RegisterPage({super.key, required this.authService});
 
   @override
   State<RegisterPage> createState() => _RegisterPageState();
@@ -12,8 +14,6 @@ class _RegisterPageState extends State<RegisterPage> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
-
-  final AuthService authService = AuthService();
 
   bool loading = false;
   bool obscurePassword = true;
@@ -55,14 +55,14 @@ class _RegisterPageState extends State<RegisterPage> {
     });
 
     try {
-      await authService.register(email, password);
+      await widget.authService.register(email, password);
 
       if (mounted) {
         showMessage("Conta criada com sucesso!");
         Navigator.pop(context);
       }
-    } catch (e) {
-      showMessage("Não foi possível criar a conta.");
+    } catch (error) {
+      if (mounted) showMessage(AuthService.errorMessage(error));
     }
 
     if (mounted) {

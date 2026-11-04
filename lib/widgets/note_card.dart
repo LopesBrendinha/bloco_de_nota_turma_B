@@ -3,14 +3,18 @@ import 'package:flutter/material.dart';
 
 class NoteCard extends StatelessWidget {
   final Note note;
-  final VoidCallback onTap;
-  final VoidCallback onDelete;
+  final String? categoryName;
+  final VoidCallback? onTap;
+
+  /// Botões exibidos à direita do cartão.
+  final List<Widget> actions;
 
   const NoteCard({
     super.key,
     required this.note,
-    required this.onTap,
-    required this.onDelete,
+    this.categoryName,
+    this.onTap,
+    required this.actions,
   });
 
   @override
@@ -22,7 +26,7 @@ class NoteCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 15,
             offset: Offset(0, 5),
           ),
@@ -67,20 +71,42 @@ class NoteCard extends StatelessWidget {
                       style: TextStyle(color: Color(0xff77717f), height: 1.4),
                     ),
                     SizedBox(height: 8),
-                    Text(
-                      note.date,
-                      style: TextStyle(fontSize: 11, color: Color(0xff9a94a1)),
+                    Wrap(
+                      spacing: 10,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        if (categoryName != null)
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 9,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Color(0xffede5fa),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              categoryName!,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xff6c4ab6),
+                              ),
+                            ),
+                          ),
+                        Text(
+                          note.date,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Color(0xff9a94a1),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
-              IconButton(
-                onPressed: onDelete,
-                icon: Icon(
-                  Icons.delete_outline_rounded,
-                  color: Color(0xffb45f6c),
-                ),
-              ),
+              ...actions,
             ],
           ),
         ),

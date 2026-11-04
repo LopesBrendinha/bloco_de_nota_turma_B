@@ -1,12 +1,11 @@
-import 'dart:math';
-
-import 'package:blocodenotasturmab/screens/notes_page.dart';
 import 'package:blocodenotasturmab/screens/register_page.dart';
 import 'package:blocodenotasturmab/services/auth_service.dart';
 import 'package:flutter/material.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  final AuthService authService;
+
+  const LoginPage({super.key, required this.authService});
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -15,8 +14,6 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
-
-  final AuthService authService = AuthService();
 
   bool loading = false;
   bool obscurePassword = true;
@@ -40,19 +37,13 @@ class _LoginPageState extends State<LoginPage> {
       loading = true;
     });
     try {
-      final user = await authService.login(
+      // Ao entrar, o AuthGate percebe a mudança e abre a tela de notas.
+      await widget.authService.login(
         emailController.text.trim(),
         passwordController.text.trim(),
       );
-
-      if (user != null && mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => NotesPage()),
-        );
-      }
-    } catch (e) {
-      showMessage("Não foi posível realizar o login.");
+    } catch (error) {
+      if (mounted) showMessage(AuthService.errorMessage(error));
     }
 
     if (mounted) {
@@ -182,7 +173,10 @@ class _LoginPageState extends State<LoginPage> {
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => RegisterPage()),
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              RegisterPage(authService: widget.authService),
+                        ),
                       );
                     },
                     child: Text("Ainda não possui uma conta? Cadastre-se"),
