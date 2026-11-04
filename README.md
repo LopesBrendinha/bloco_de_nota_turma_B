@@ -39,8 +39,9 @@ Este projeto evolui o [bloco de notas da turma B](https://github.com/LopesBrendi
 ## Como executar
 
 Você precisa do [Flutter](https://docs.flutter.dev/get-started/install) e de um
-emulador, simulador ou celular. O aplicativo é para Android e iOS, porque o
-`sqflite` não funciona na web.
+emulador Android ou celular. O repositório está configurado e testado para
+**Android**. Para usar no iOS, rode `flutterfire configure` incluindo essa
+plataforma. O aplicativo não funciona na web, porque o `sqflite` não tem suporte a ela.
 
 ```bash
 git clone <url-do-seu-fork>
@@ -50,8 +51,8 @@ flutter pub get
 flutter run
 ```
 
-Para usar um projeto Firebase próprio, siga a próxima seção antes do
-`flutter run`.
+O repositório já está ligado ao projeto Firebase `bloco-de-notas-36ede`. Para
+usar um projeto próprio, siga a próxima seção antes do `flutter run`.
 
 Para rodar os testes:
 
@@ -70,7 +71,7 @@ flutter test
    npm install -g firebase-tools
    firebase login
    dart pub global activate flutterfire_cli
-   flutterfire configure --project=<id-do-projeto>
+   flutterfire configure --project=<id-do-projeto> --platforms=android
    ```
 
    Esse comando atualiza `lib/firebase_options.dart` e
