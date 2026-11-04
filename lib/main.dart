@@ -4,10 +4,15 @@ import 'package:blocodenotasturmab/screens/notes_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // No navegador o SQLite roda via WebAssembly (arquivos em web/).
+  if (kIsWeb) databaseFactory = databaseFactoryFfiWeb;
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
