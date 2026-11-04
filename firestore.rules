@@ -1,0 +1,58 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // O usuário autenticado só acessa dados dentro da própria pasta.
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function isOptionalInt(value) {
+      return value == null || value is int;
+    }
+
+    // Os limites são os mesmos de Note.maxTitleLength e Note.maxContentLength.
+    function isValidNote(uid) {
+      let data = request.resource.data;
+      return data.keys().hasOnly([
+          'uid', 'title', 'content', 'categoryId',
+          'createdAt', 'updatedAt', 'trashedAt', 'serverUpdatedAt'
+        ])
+        && data.keys().hasAll(['uid', 'title', 'content', 'createdAt', 'updatedAt'])
+        && data.uid == uid
+        && data.title is string && data.title.size() <= 300
+        && data.content is string && data.content.size() <= 100000
+        && (!('categoryId' in data) || data.categoryId == null || data.categoryId is string)
+        && data.createdAt is int
+        && data.updatedAt is int
+        && (!('trashedAt' in data) || isOptionalInt(data.trashedAt));
+    }
+
+    // O limite é o mesmo de NoteCategory.maxNameLength.
+    function isValidCategory(uid) {
+      let data = request.resource.data;
+      return data.keys().hasOnly(['uid', 'name', 'updatedAt', 'serverUpdatedAt'])
+        && data.keys().hasAll(['uid', 'name', 'updatedAt'])
+        && data.uid == uid
+        && data.name is string
+        && data.name.size() > 0 && data.name.size() <= 40
+        && data.updatedAt is int;
+    }
+
+    match /users/{uid}/notes/{noteId} {
+      allow read, delete: if isOwner(uid);
+      allow create, update: if isOwner(uid) && isValidNote(uid);
+    }
+
+    match /users/{uid}/categories/{categoryId} {
+      allow read, delete: if isOwner(uid);
+      allow create, update: if isOwner(uid) && isValidCategory(uid);
+    }
+
+    // Qualquer outro caminho é negado.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
