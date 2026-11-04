@@ -215,8 +215,16 @@ Se qualquer etapa falhar, `sync` retorna `false`, os dados locais ficam intactos
 
 ![login](docs/screenshots/01-login.jpg)
 
+**Lista de notas** com pesquisa, filtro por categoria e notas sincronizadas (sem o ícone de pendência)
+
+![lista](docs/screenshots/02-lista.png)
+
 ### Evidências no Firebase
-**Firestore:** notas gravadas em `users/{uid}/notes`, uma subcoleção por usuário
+**Firestore:** a nota "Trabaia - Bernardo" da lista acima, gravada em `users/{uid}/notes/{remoteId}` com todos os campos. O `uid` é o mesmo do usuário autenticado e o ID do documento é o `remoteId` (UUID) gerado no app.
+
+![firestore nota](docs/screenshots/06-firestore-nota.png)
+
+**Firestore:** estrutura de coleções, com uma pasta por usuário
 
 ![firestore](docs/screenshots/06-firestore.png)
 
