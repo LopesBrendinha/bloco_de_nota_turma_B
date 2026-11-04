@@ -1,11 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/note.dart';
+import '../models/note_category.dart';
 import '../repositories/notes_repository.dart';
 import '../services/auth_service.dart';
 import '../widgets/confirm_dialog.dart';
 import '../widgets/note_card.dart';
 import '../widgets/sync_status_banner.dart';
+import 'categories_page.dart';
 import 'note_form_page.dart';
 
 class NotesPage extends StatefulWidget {
@@ -25,7 +29,12 @@ class NotesPage extends StatefulWidget {
 }
 
 class _NotesPageState extends State<NotesPage> with WidgetsBindingObserver {
+  final searchController = TextEditingController();
+
+  Timer? searchTimer;
   List<Note> notes = [];
+  List<NoteCategory> categories = [];
+  String? selectedCategoryId;
   bool loading = true;
 
   /// Número da última busca. Se o usuário digitar rápido, uma resposta
@@ -33,6 +42,9 @@ class _NotesPageState extends State<NotesPage> with WidgetsBindingObserver {
   int lastLoad = 0;
 
   NotesRepository get repository => widget.repository;
+
+  bool get isFiltering =>
+      searchController.text.trim().isNotEmpty || selectedCategoryId != null;
 
   @override
   void initState() {
@@ -57,14 +69,54 @@ class _NotesPageState extends State<NotesPage> with WidgetsBindingObserver {
   Future<void> loadNotes() async {
     final load = ++lastLoad;
 
-    final loadedNotes = await repository.getNotes();
+    final loadedCategories = await repository.getCategories();
+
+    // A categoria selecionada pode ter sido apagada aqui ou em outro aparelho.
+    if (!loadedCategories.any((item) => item.id == selectedCategoryId)) {
+      selectedCategoryId = null;
+    }
+
+    final loadedNotes = await repository.getNotes(
+      query: searchController.text,
+      categoryId: selectedCategoryId,
+    );
 
     if (mounted && load == lastLoad) {
       setState(() {
+        categories = loadedCategories;
         notes = loadedNotes;
         loading = false;
       });
     }
+  }
+
+  void onSearchChanged(String _) {
+    // Espera uma pausa na digitação para não consultar a cada tecla.
+    searchTimer?.cancel();
+    searchTimer = Timer(const Duration(milliseconds: 250), loadNotes);
+
+    // Atualiza o botão de limpar a pesquisa.
+    setState(() {});
+  }
+
+  void clearSearch() {
+    searchTimer?.cancel();
+    searchController.clear();
+    loadNotes();
+  }
+
+  void selectCategory(String? categoryId) {
+    setState(() {
+      selectedCategoryId = categoryId;
+    });
+    loadNotes();
+  }
+
+  String? categoryNameOf(Note note) {
+    for (final category in categories) {
+      if (category.id == note.categoryId) return category.name;
+    }
+    return null;
   }
 
   Future<void> deleteNote(Note note) async {
@@ -108,10 +160,20 @@ class _NotesPageState extends State<NotesPage> with WidgetsBindingObserver {
     );
   }
 
+  void openCategories() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => CategoriesPage(repository: repository)),
+    );
+  }
+
   @override
   void dispose() {
     repository.removeListener(loadNotes);
     WidgetsBinding.instance.removeObserver(this);
+    searchTimer?.cancel();
+    searchController.dispose();
+
     super.dispose();
   }
 
@@ -125,6 +187,12 @@ class _NotesPageState extends State<NotesPage> with WidgetsBindingObserver {
         ),
 
         actions: [
+          IconButton(
+            tooltip: 'Categorias',
+            onPressed: openCategories,
+            icon: const Icon(Icons.label_outline_rounded),
+          ),
+
           IconButton(
             tooltip: 'Sair',
             onPressed: logout,
@@ -169,11 +237,69 @@ class _NotesPageState extends State<NotesPage> with WidgetsBindingObserver {
               onRetry: repository.syncNow,
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
+
+            TextField(
+              controller: searchController,
+              onChanged: onSearchChanged,
+              textInputAction: TextInputAction.search,
+              decoration: InputDecoration(
+                hintText: 'Pesquisar no título ou no conteúdo',
+                prefixIcon: const Icon(Icons.search_rounded),
+                suffixIcon: searchController.text.isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: 'Limpar pesquisa',
+                        onPressed: clearSearch,
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+              ),
+            ),
+
+            const SizedBox(height: 10),
+
+            SizedBox(
+              height: 44,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: [
+                  categoryChip('Todas', null),
+                  for (final category in categories)
+                    categoryChip(category.name, category.id),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            if (isFiltering && !loading)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  notes.length == 1
+                      ? '1 nota encontrada'
+                      : '${notes.length} notas encontradas',
+                  style: const TextStyle(
+                    color: Color(0xFF77717F),
+                    fontSize: 13,
+                  ),
+                ),
+              ),
 
             Expanded(child: buildList()),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget categoryChip(String label, String? categoryId) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: selectedCategoryId == categoryId,
+        onSelected: (_) => selectCategory(categoryId),
       ),
     );
   }
@@ -191,7 +317,7 @@ class _NotesPageState extends State<NotesPage> with WidgetsBindingObserver {
               physics: const AlwaysScrollableScrollPhysics(),
               children: [
                 const SizedBox(height: 40),
-                buildEmptyState(),
+                isFiltering ? buildNoResults() : buildEmptyState(),
               ],
             )
           : ListView.builder(
@@ -205,6 +331,8 @@ class _NotesPageState extends State<NotesPage> with WidgetsBindingObserver {
 
                 return NoteCard(
                   note: note,
+                  categoryName: categoryNameOf(note),
+
                   onTap: () => openNoteForm(note),
 
                   actions: [
@@ -220,6 +348,28 @@ class _NotesPageState extends State<NotesPage> with WidgetsBindingObserver {
                 );
               },
             ),
+    );
+  }
+
+  Widget buildNoResults() {
+    return const Column(
+      children: [
+        Icon(Icons.search_off_rounded, size: 50, color: Color(0xFF6C4AB6)),
+
+        SizedBox(height: 16),
+
+        Text(
+          'Nenhuma nota encontrada',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+
+        SizedBox(height: 8),
+
+        Text(
+          'Tente outra palavra ou outra categoria.',
+          style: TextStyle(color: Color(0xFF77717F)),
+        ),
+      ],
     );
   }
 

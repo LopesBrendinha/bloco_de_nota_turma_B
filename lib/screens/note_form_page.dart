@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/note.dart';
+import '../models/note_category.dart';
 import '../repositories/notes_repository.dart';
+import '../widgets/create_category_dialog.dart';
 
 class NoteFormPage extends StatefulWidget {
   final NotesRepository repository;
@@ -19,6 +21,10 @@ class _NoteFormPageState extends State<NoteFormPage> {
 
   final contentController = TextEditingController();
 
+  List<NoteCategory> categories = [];
+
+  String? selectedCategoryId;
+
   bool saving = false;
 
   bool get isEditing => widget.note != null;
@@ -31,6 +37,37 @@ class _NoteFormPageState extends State<NoteFormPage> {
       titleController.text = widget.note!.title;
 
       contentController.text = widget.note!.content;
+
+      selectedCategoryId = widget.note!.categoryId;
+    }
+
+    loadCategories();
+  }
+
+  Future<void> loadCategories() async {
+    final result = await widget.repository.getCategories();
+
+    if (mounted) {
+      setState(() {
+        categories = result;
+
+        // A categoria pode ter sido apagada em outro aparelho.
+        if (!categories.any((item) => item.id == selectedCategoryId)) {
+          selectedCategoryId = null;
+        }
+      });
+    }
+  }
+
+  Future<void> createCategory() async {
+    final category = await showCreateCategoryDialog(
+      context,
+      widget.repository,
+    );
+
+    if (category != null) {
+      selectedCategoryId = category.id;
+      await loadCategories();
     }
   }
 
@@ -57,7 +94,7 @@ class _NoteFormPageState extends State<NoteFormPage> {
         id: widget.note?.id,
         title: title,
         content: content,
-        categoryId: widget.note?.categoryId,
+        categoryId: selectedCategoryId,
       );
 
       // Depois de salvar,
@@ -131,6 +168,51 @@ class _NoteFormPageState extends State<NoteFormPage> {
                 filled: false,
                 contentPadding: EdgeInsets.symmetric(horizontal: 4),
               ),
+            ),
+
+            const Divider(color: Color(0xFFE4DFEA)),
+
+            Row(
+              children: [
+                const Icon(
+                  Icons.label_outline_rounded,
+                  size: 20,
+                  color: Color(0xFF77717F),
+                ),
+
+                const SizedBox(width: 10),
+
+                Expanded(
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String?>(
+                      isExpanded: true,
+                      value: selectedCategoryId,
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('Sem categoria'),
+                        ),
+                        for (final category in categories)
+                          DropdownMenuItem<String?>(
+                            value: category.id,
+                            child: Text(category.name),
+                          ),
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          selectedCategoryId = value;
+                        });
+                      },
+                    ),
+                  ),
+                ),
+
+                TextButton.icon(
+                  onPressed: createCategory,
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('Nova'),
+                ),
+              ],
             ),
 
             const Divider(color: Color(0xFFE4DFEA)),
