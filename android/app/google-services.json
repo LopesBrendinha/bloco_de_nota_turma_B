@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "363520809972",
-    "project_id": "bdbloco",
-    "storage_bucket": "bdbloco.firebasestorage.app"
+    "project_number": "912892595549",
+    "project_id": "bloco-notas-matheus-2026",
+    "storage_bucket": "bloco-notas-matheus-2026.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:363520809972:android:6a7d83d420af207e1637a1",
+        "mobilesdk_app_id": "1:912892595549:android:8e91a58c1c23fa1806ecb4",
         "android_client_info": {
           "package_name": "com.example.blocodenotasturmab"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBxyB_nAaX3iEQdW-1h_z3DkCDjlLRzb2k"
+          "current_key": "AIzaSyBHMiz_apddigvNCljQLV7WR_VElkoOUl0"
         }
       ],
       "services": {
