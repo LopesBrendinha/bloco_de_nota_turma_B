@@ -1,7 +1,5 @@
-
-
-import 'package:blocodenotasturmab/database/database_helper.dart';
 import 'package:blocodenotasturmab/models/note.dart';
+import 'package:blocodenotasturmab/services/note_repository.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -15,11 +13,24 @@ class NoteFormPage extends StatefulWidget {
 }
 
 class _NoteFormPageState extends State<NoteFormPage> {
+  static const String _newCategoryValue = '__nova_categoria__';
+  static const List<String> _defaultCategories = [
+    'Estudos',
+    'Trabalho',
+    'Pessoal',
+  ];
+
   final titleController = TextEditingController();
 
   final contentController = TextEditingController();
 
-  final database = DatabaseHelper.instance;
+  final repository = NoteRepository();
+
+  List<String> categories = [..._defaultCategories];
+
+  String category = 'Pessoal';
+
+  bool saving = false;
 
   bool get isEditing => widget.note != null;
 
@@ -31,66 +42,106 @@ class _NoteFormPageState extends State<NoteFormPage> {
       titleController.text = widget.note!.title;
 
       contentController.text = widget.note!.content;
+
+      category = widget.note!.category;
+    }
+
+    loadCategories();
+  }
+
+  // Categorias padrão + as que o usuário já criou.
+  Future<void> loadCategories() async {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) return;
+
+    final saved = await repository.categories(user.uid);
+
+    final all = <String>{..._defaultCategories, ...saved, category}.toList();
+
+    if (mounted) {
+      setState(() {
+        categories = all;
+      });
     }
   }
 
+  Future<void> createCategory() async {
+    final controller = TextEditingController();
+
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Nova categoria'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Nome da categoria'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Criar'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted || name == null || name.isEmpty) return;
+
+    setState(() {
+      if (!categories.contains(name)) {
+        categories.add(name);
+      }
+      category = name;
+    });
+  }
+
   Future<void> saveNote() async {
+    if (saving) return;
+
     // Pegamos o usuário atualmente autenticado.
     final user = FirebaseAuth.instance.currentUser;
 
     // Sem usuário não podemos salvar.
     if (user == null) return;
 
-    // Pegamos os valores digitados.
     final title = titleController.text.trim();
 
     final content = contentController.text.trim();
 
     // Verificamos se existe conteúdo.
     if (content.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Escreva algo na nota.')));
       return;
     }
 
-    // Criamos a data da alteração.
-    final now = DateTime.now();
+    setState(() => saving = true);
 
-    final date =
-        '${now.day.toString().padLeft(2, '0')}/'
-        '${now.month.toString().padLeft(2, '0')}/'
-        '${now.year} '
-        '${now.hour.toString().padLeft(2, '0')}:'
-        '${now.minute.toString().padLeft(2, '0')}';
-
-    // Criamos um objeto Note.
-    //
-    // Se estamos editando:
-    //     widget.note?.id
-    // mantém o ID existente.
-    //
-    // Se estamos criando:
-    //     o ID será null.
+    // Se estamos editando, mantém o id e o estado de arquivada;
+    // se estamos criando, gera um id novo.
     final note = Note(
-      id: widget.note?.id,
+      id: widget.note?.id ?? repository.newId(),
       uid: user.uid,
       title: title,
       content: content,
-      date: date,
+      category: category,
+      archived: widget.note?.archived ?? false,
+      updatedAt: DateTime.now().millisecondsSinceEpoch,
     );
 
-    // Verificamos se estamos criando
-    // ou editando uma nota.
-    if (isEditing) {
-      // UPDATE
-      await database.updateNote(note);
-    } else {
-      // INSERT
-      await database.insertNote(note);
-    }
+    // Salva no SQLite e tenta enviar ao Firestore.
+    // O resultado diz se a nuvem foi atualizada.
+    final syncedToCloud = await repository.save(note);
 
-    // Depois de salvar,
-    // voltamos para a tela anterior.
     if (mounted) {
-      Navigator.pop(context);
+      Navigator.pop(context, syncedToCloud);
     }
   }
 
@@ -113,7 +164,8 @@ class _NoteFormPageState extends State<NoteFormPage> {
 
         actions: [
           IconButton(
-            onPressed: saveNote,
+            tooltip: 'Salvar',
+            onPressed: saving ? null : saveNote,
             icon: const Icon(Icons.check_rounded),
           ),
 
@@ -144,6 +196,44 @@ class _NoteFormPageState extends State<NoteFormPage> {
             ),
 
             const Divider(color: Color(0xFFE4DFEA)),
+
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: DropdownButton<String>(
+                value: category,
+                isExpanded: true,
+                underline: const SizedBox(),
+                items: [
+                  ...categories.map(
+                    (c) => DropdownMenuItem(value: c, child: Text(c)),
+                  ),
+                  const DropdownMenuItem(
+                    value: _newCategoryValue,
+                    child: Row(
+                      children: [
+                        Icon(Icons.add_rounded, size: 18),
+                        SizedBox(width: 8),
+                        Text('Nova categoria...'),
+                      ],
+                    ),
+                  ),
+                ],
+                onChanged: (value) {
+                  if (value == null) return;
+
+                  if (value == _newCategoryValue) {
+                    createCategory();
+                  } else {
+                    setState(() => category = value);
+                  }
+                },
+              ),
+            ),
 
             Expanded(
               child: TextField(

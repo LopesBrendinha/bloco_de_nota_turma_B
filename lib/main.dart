@@ -1,5 +1,7 @@
 import 'package:blocodenotasturmab/firebase_options.dart';
 import 'package:blocodenotasturmab/screens/login_page.dart';
+import 'package:blocodenotasturmab/screens/notes_page.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
@@ -20,7 +22,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
 
-      title: 'Flutter Demo',
+      title: 'Bloco de Notas',
       theme: ThemeData(
         useMaterial3: true,
 
@@ -75,7 +77,10 @@ class MyApp extends StatelessWidget {
 
         
       ),
-      home: LoginPage(),
+      // Se já existe usuário logado, abre direto as notas.
+      home: FirebaseAuth.instance.currentUser == null
+          ? LoginPage()
+          : NotesPage(),
     );
   }
 }
