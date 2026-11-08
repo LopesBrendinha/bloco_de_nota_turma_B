@@ -46,14 +46,14 @@ class DefaultFirebaseOptions {
     }
   }
 
-  static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyDlQfZ1poYgiLByul2YBTQZ04nr5d6Y1SE',
-    appId: '1:363520809972:web:2409763c5411199d1637a1',
-    messagingSenderId: '363520809972',
-    projectId: 'bdbloco',
-    authDomain: 'bdbloco.firebaseapp.com',
-    storageBucket: 'bdbloco.firebasestorage.app',
-    measurementId: 'G-ETWN1N8W68',
+   static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'SUA_API_KEY_AQUI',
+    appId: 'SEU_APP_ID_AQUI',
+    messagingSenderId: 'SEU_SENDER_ID_AQUI',
+    projectId: 'SEU_PROJECT_ID_AQUI',
+    authDomain: 'SEU_PROJECT_ID_AQUI.firebaseapp.com',
+    storageBucket: 'SEU_PROJECT_ID_AQUI.firebasestorage.app',
+    measurementId: 'SEU_MEASUREMENT_ID_AQUI',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
